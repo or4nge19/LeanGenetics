@@ -22,7 +22,7 @@ This file defines 2 functions called `codon` and `anticodon` that match a 3 lett
     template strand is the input
 * `dna_to_rna_coding`: Converts a coding strand of DNA into a sequence of amino acids assuming
     coding strand is input
-*  `Redundant`: Not injective, not one-to-one
+* `Redundant`: Not injective, not one-to-one
 
 ## Main Proofs
 * `template_coding_equivalence`: `dna_to_rna_template` applied to a list is equivalent to
@@ -31,7 +31,8 @@ This file defines 2 functions called `codon` and `anticodon` that match a 3 lett
     `dna_to_rna_template` applied to that list
 * `injective_dna_to_rna_template`: The function `dna_to_rna_template` is injective or one-to-one
 * `redundant_rna_to_amino`: The function `rna_to_amino` is redundant or not injective
-* `redundant_genetic_code`: The function `dna_to_amino` representing the genetic code is redundant
+* `redundant_genetic_code`: The function `dna_to_amino_template` representing the genetic code is
+    redundant
 
 ## Implementation Details
 This file assumes that the reading frame begins at the first nucleotide always and all lists are
@@ -172,9 +173,12 @@ def rna_to_amino (L : List (List NucBase)) : List AminoAcid :=
 def dna_to_amino_template (hs : ∀ n ∈ s, n.isDNABase) : List AminoAcid :=
   (dna_to_rna_template s hs).toChunks 3 |> rna_to_amino
 
+def dna_to_amino_coding (hs : ∀ n ∈ s, n.isDNABase) : List AminoAcid :=
+  (dna_to_rna_coding s hs).toChunks 3 |> rna_to_amino
+
 
 /- # Proofs # -/
-theorem template_coding_equivalence (hs : ∀ n ∈ s, n.isDNABase) :
+lemma template_coding_toRNA_equivalence (hs : ∀ n ∈ s, n.isDNABase) :
     dna_to_rna_template s.reverse (by aesop) = dna_to_rna_coding s hs ∧
     dna_to_rna_template s hs = dna_to_rna_coding s.reverse (by aesop) := by
   constructor
@@ -182,6 +186,13 @@ theorem template_coding_equivalence (hs : ∀ n ∈ s, n.isDNABase) :
     congr
     rw [reverse_reverse s]
   · exact rfl
+
+theorem template_coding_toAmino_equivalence (hs : ∀ n ∈ s, n.isDNABase) :
+    dna_to_amino_template s.reverse (by aesop) = dna_to_amino_coding s hs ∧
+    dna_to_amino_template s (hs) = dna_to_amino_coding s.reverse (by aesop) := by
+  unfold dna_to_amino_template dna_to_amino_coding
+  rw [(template_coding_toRNA_equivalence s hs).1, (template_coding_toRNA_equivalence s hs).2]
+  exact ⟨rfl, rfl⟩
 
 lemma injective_dna_to_rna_singlet :
     Injective (fun n : {x // NucBase.isDNABase x} ↦ dna_to_rna_singlet n n.prop) := by
@@ -194,13 +205,11 @@ lemma singlet_iff (n₁ n₂ : {x // NucBase.isDNABase x}) :
     dna_to_rna_singlet n₁ n₁.prop = dna_to_rna_singlet n₂ n₂.prop ↔ n₁ = n₂ := by
   obtain ⟨n₁, hn₁⟩ := n₁
   obtain ⟨n₂, hn₂⟩ := n₂
-  constructor
-  · simp only [Subtype.mk.injEq]
-    have h' := injective_dna_to_rna_singlet
+  constructor <;> simp only [Subtype.mk.injEq]
+  · have h' := injective_dna_to_rna_singlet
     simp only [Injective, Subtype.forall, Subtype.mk.injEq] at h'
     apply h' <;> assumption
-  · simp only [Subtype.mk.injEq]
-    intro h
+  · intro h
     congr
 
 theorem length_equivalence (hs : ∀ n ∈ s, n.isDNABase = True) :
@@ -272,7 +281,7 @@ theorem redundant_rna_to_amino : Redundant rna_to_amino := by
   exact ⟨rfl, of_decide_eq_false rfl⟩
 
 theorem redundant_genetic_code :
-    Redundant (fun s : {x : List NucBase // ∀ n ∈ x, n.isDNABase} ↦ dna_to_amino s s.prop)
+    Redundant (fun s : {x : List NucBase // ∀ n ∈ x, n.isDNABase} ↦ dna_to_amino_template s s.prop)
     := by
   simp only [Redundant, Injective, not_forall]
   use ⟨[A, A, A], by decide⟩, ⟨[G, A, A], by decide⟩
