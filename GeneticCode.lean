@@ -27,7 +27,7 @@ This file defines 2 functions called `codon` and `anticodon` that match a 3 lett
 ## Main Proofs
 * `template_coding_equivalence`: `dna_to_rna_template` applied to a list is equivalent to
     `dna_to_rna` applied to that list reversed
-* `length_equivalence`: The length of the list is equal to the length of the output of
+* `length_conservation`: The length of the list is equal to the length of the output of
     `dna_to_rna_template` applied to that list
 * `injective_dna_to_rna_template`: The function `dna_to_rna_template` is injective or one-to-one
 * `redundant_rna_to_amino`: The function `rna_to_amino` is redundant or not injective
@@ -212,7 +212,7 @@ lemma singlet_iff (n₁ n₂ : {x // NucBase.isDNABase x}) :
   · intro h
     congr
 
-theorem length_equivalence (hs : ∀ n ∈ s, n.isDNABase = True) :
+theorem length_conservation (hs : ∀ n ∈ s, n.isDNABase = True) :
     s.length = (dna_to_rna_template s hs).length := by
   induction s
   · rfl
@@ -220,13 +220,13 @@ theorem length_equivalence (hs : ∀ n ∈ s, n.isDNABase = True) :
       pmap_cons, pmap_nil, length_append, length_reverse, length_pmap,
       length_cons, length_nil, zero_add]
 
-lemma length_conservation (s₁ s₂ : List NucBase) (hs₁ : ∀ n₁ ∈ s₁, n₁.isDNABase = True)
+lemma length_equivalence (s₁ s₂ : List NucBase) (hs₁ : ∀ n₁ ∈ s₁, n₁.isDNABase = True)
     (hs₂ : ∀ n₂ ∈ s₂, n₂.isDNABase = True) :
     s₁.length = s₂.length ↔ (dna_to_rna_template s₁ hs₁).length =
       (dna_to_rna_template s₂ hs₂).length := by
   apply Iff.intro <;> intro h
-  · rw [← length_equivalence s₁, ← length_equivalence s₂, h]
-  · rw [length_equivalence s₁, length_equivalence s₂, h]
+  · rw [← length_conservation s₁, ← length_conservation s₂, h]
+  · rw [length_conservation s₁, length_conservation s₂, h]
 
 theorem injective_dna_to_rna_template :
     Injective (fun s : {x : List NucBase // ∀ n ∈ x, n.isDNABase} ↦ dna_to_rna_template s s.prop)
@@ -252,10 +252,10 @@ theorem injective_dna_to_rna_template :
     have hj₂ : (pmap dna_to_rna_singlet s₂ hs₂).length =
         (pmap dna_to_rna_singlet s₂.reverse (by aesop)).length := by
       simp only [length_pmap, pmap_reverse, length_reverse]
-    rw [length_equivalence s₁] at hx₁
+    rw [length_conservation s₁] at hx₁
     unfold dna_to_rna_template at hx₁
     rw [← hj₁] at hx₁
-    rw [length_equivalence s₂] at hx₂
+    rw [length_conservation s₂] at hx₂
     unfold dna_to_rna_template at hx₂
     rw [← hj₂] at hx₂
     simp only [Subtype.mk.injEq] at hi
@@ -270,7 +270,7 @@ theorem injective_dna_to_rna_template :
   · intro h
     have h₁ := congrArg length h
     have h₂ : (dna_to_rna_template s₁ hs₁).length ≠ (dna_to_rna_template s₂ hs₂).length := by
-      rw [← length_equivalence s₁, ← length_equivalence s₂]
+      rw [← length_conservation s₁, ← length_conservation s₂]
       exact hL
     contradiction
 
