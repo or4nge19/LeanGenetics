@@ -1,6 +1,6 @@
 /-
 Authors: Colin Jones
-Last Updated: 06/04/2025
+Last Updated: 06/10/2025
 Description: Contains a function that allows the user to convert a coding strand of DNA into a
   sequence of RNA or amino acids. Proves the injectivity of mapping DNA to RNA and the redundancy
   (non-injectivity) of DNA and RNA to amino acid. Includes brief exploration of point mutations.
@@ -169,7 +169,7 @@ def rna_to_amino (L : List (List NucBase)) : List AminoAcid :=
 /- ### Main Function ###
   dna_to_amino: Takes a list of DNA nucleic acids and converts them into a sequence of amino acids
 -/
-def dna_to_amino (hs : ∀ n ∈ s, n.isDNABase) : List AminoAcid :=
+def dna_to_amino_template (hs : ∀ n ∈ s, n.isDNABase) : List AminoAcid :=
   (dna_to_rna_template s hs).toChunks 3 |> rna_to_amino
 
 
