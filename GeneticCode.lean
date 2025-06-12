@@ -15,6 +15,9 @@ This file defines 2 functions called `codon` and `anticodon` that match a 3 lett
   of 4 letters (`U`, `A`, `G`, or `C`) with their respective amino acid.
 
 ## Main Definitions
+* `Redundant`: Not injective, not one-to-one
+
+## Main Functions
 * `dna_to_rna_template`: Converts a coding strand of DNA into RNA assuming the strand is template
 * `dna_to_rna_coding`: Converts a coding strand of DNA into RNA assuming the strand is coding
 * `rna_to_amino`: Takes a list of RNA triplets and converts them into a list of amino acids
@@ -22,7 +25,8 @@ This file defines 2 functions called `codon` and `anticodon` that match a 3 lett
     template strand is the input
 * `dna_to_rna_coding`: Converts a coding strand of DNA into a sequence of amino acids assuming
     coding strand is input
-* `Redundant`: Not injective, not one-to-one
+* `dna_to_amino_template`: Converts a template strand of DNA into its corresponding peptide chain
+* `dna_to_amino_coding`: Converts a template strand of DNA into its corresponding peptide chain
 
 ## Main Proofs
 * `template_coding_equivalence`: `dna_to_rna_template` applied to a list is equivalent to
