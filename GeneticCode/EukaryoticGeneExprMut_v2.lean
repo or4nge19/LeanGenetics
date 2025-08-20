@@ -1,8 +1,6 @@
-import Batteries.Data.List.Lemmas
-import Mathlib.Data.List.Basic
-import Mathlib.Data.Nat.Basic
-import Mathlib.Tactic
-import Mathlib
+import Mathlib.Algebra.Order.Ring.Star
+import Mathlib.Analysis.Normed.Group.Basic
+import Mathlib.Probability.ProbabilityMassFunction.Constructions
 
 /-!
 # A Formal Model of Eukaryotic Gene Expression and Mutation
@@ -77,11 +75,10 @@ Key simplifications (TODO) include:
 
 /-!
 # Formal Verification of Eukaryotic Gene Expression and Genetic Variation
-
 -/
 
 
--- Section 1: Enhanced List Lemmas and Utilities
+/-! ### Section 1: Enhanced List Lemmas and Utilities -/
 namespace List
 
 lemma take_drop_append {α : Type*} (l : List α) (n : Nat) :
@@ -155,7 +152,7 @@ decreasing_by
   simp_wf
   cases l' with
   | nil => aesop
-  | cons _ _ => simp [List.length_drop]; omega
+  | cons _ _ => simp; omega
 
 def chunkList {α} (n : Nat) (l : List α) : List (List α) :=
   if h : n > 0 then chunkListPos n h l else []
@@ -166,7 +163,7 @@ def getNth? {α : Type*} (l : List α) (n : Nat) : Option α :=
 end List
 
 
--- Section 2: Core Biological Entities with Complete Definitions
+/-! ### Section 2: Core Biological Entities  -/
 namespace Bio
 
 inductive DNABase
@@ -174,8 +171,8 @@ inductive DNABase
   deriving Repr, DecidableEq, Inhabited, BEq
 
 /--
-**ENHANCEMENT:** Added `DegenerateDNABase` to model ambiguity, as suggested.
-This is critical for applications like primer design and consensus sequences.
+Includes `DegenerateDNABase` to model ambiguity forr applications 
+like primer design and consensus sequences.
 -/
 inductive DegenerateDNABase
   | Standard (b : DNABase)
@@ -201,7 +198,7 @@ inductive AminoAcid
   deriving Repr, DecidableEq, Inhabited, BEq
 
 /--
-**ENHANCEMENT:** Added `AminoAcidProperties` for higher-level reasoning.
+Includes `AminoAcidProperties` for higher-level reasoning.
 This enables proving theorems about the functional impact of missense mutations
 (e.g., conservative vs. non-conservative changes).
 -/
@@ -250,7 +247,7 @@ inductive MutationEffect
 
 end Bio
 
--- Section 3: Enhanced Gene Architecture
+-- ### Section 3: Enhanced Gene Architecture
 namespace Bio.Sequence
 
 open Bio
@@ -303,8 +300,8 @@ instance : Inhabited GenomicRegion :=
 def GenomicRegion.length (r : GenomicRegion) : Nat := r.end_ - r.start
 
 /--
-**ENHANCEMENT:** The hardcoded GT/AG rules are replaced by a data-driven
-`SpliceSiteSignature` structure. This makes the model more general and extensible
+We use  a data-driven `SpliceSiteSignature` structure. 
+This makes the model more general and extensible
 to non-canonical splice sites.
 -/
 structure SpliceSiteSignature where
@@ -320,16 +317,16 @@ structure Gene where
   id : String
   coding_strand : DNAStrand
   exons : List GenomicRegion
-  splice_sites : SpliceSiteSignature -- REPLACED hardcoded fields
+  splice_sites : SpliceSiteSignature 
   promoter_region : Option GenomicRegion := none
   poly_a_site : Option Nat := none
-  strand : StrandSign                 -- NEW: unified strand field
+  strand : StrandSign                
   h_exons_sorted : List.Chain' (fun r1 r2 => r1.end_ ≤ r2.start) exons
   h_exons_bounded : ∀ r ∈ exons, r.end_ ≤ coding_strand.seq.length
   h_exons_nonempty : exons ≠ []
 
 /-
--- Added canonical splice sites to the Gene definition for a more realistic splicing model.
+-- Added canonical splice sites to the Gene definition for a more realistic splicing model??.
 structure Gene'ì where
   id : String
   coding_strand : DNAStrand
@@ -360,7 +357,7 @@ def inRegion (pos : Nat) (r : GenomicRegion) : Bool :=
 
 end Bio.Sequence
 
--- Section 4: Complete Central Dogma Implementation
+/- ### Section 4: Complete Central Dogma Implementation -/
 namespace Bio.Genetics
 
 open Bio Bio.Sequence List
@@ -553,29 +550,22 @@ private lemma foldl_chooseBest_mem_aux :
       ys.foldl chooseBest (some acc) = some r →
       r = acc ∨ r ∈ ys
   | [], acc, r, h => by
-      -- foldl on [] returns the accumulator unchanged
       simp_all only [foldl_nil, Option.some.injEq, not_mem_nil, or_false]
   | curr :: ys, acc, r, h => by
-      -- One fold step from (some acc) with current = curr
       rcases chooseBest_some_cases acc curr with ⟨acc', hstep, hacc'⟩
       have h' : ys.foldl chooseBest (some acc') = some r := by
         simpa [List.foldl, hstep] using h
-      -- Recurse on tail
       have ih := foldl_chooseBest_mem_aux ys acc' r h'
       cases ih with
       | inl heq =>
-          -- r = acc' ; tie back to acc or curr
           cases hacc' with
           | inl hacc =>
-              -- acc' = acc
               subst hacc heq
               simp_all only [foldl_cons, mem_cons, true_or]
           | inr hcurr =>
-              -- acc' = curr ⇒ r ∈ curr :: ys
               subst hcurr
-              aesop--exact Or.inr (List.mem_cons_self _ _)
+              aesop
       | inr hin =>
-          -- r ∈ ys ⇒ r ∈ curr :: ys
           exact Or.inr (List.mem_cons_of_mem _ hin)
 
 private lemma foldl_chooseBest_mem {xs : List (Nat × Nat)} {res : Nat × Nat} :
@@ -624,22 +614,16 @@ private lemma mem_isAUG_cons_AUG {rna : List RNABase} {rest' : List RNABase}
                 ((idx - if idx ≥ 3 then idx - 3 else 0) + 3 + min 5 rest'.length))) :: acc)
       ∨ ∃ rest, rna.drop p = .A :: .U :: .G :: rest) :
     (p, s) ∈ acc ∨ ∃ rest, rna.drop p = .A :: .U :: .G :: rest := by
-  -- The result `(p,s)` either came from the recursive call or was the new head `(idx, score)`.
   rcases h_ind with h_in_acc | h_is_aug
-  · -- Case 1: (p,s) was in the new accumulator `(idx, score) :: acc`.
-    cases (List.mem_cons.mp h_in_acc) with
+  · cases (List.mem_cons.mp h_in_acc) with
     | inl h_eq_head =>
-      -- It's the new head; deduce p = idx and conclude via h_head.
       have hpidx : p = idx := by
         simpa using congrArg Prod.fst h_eq_head
       subst hpidx
       exact Or.inr ⟨rest', h_head⟩
     | inr h_in_tail =>
-      -- It was in the original `acc`.
       exact Or.inl h_in_tail
-  · -- Case 2: The recursive call already proved AUG at position p.
-    exact Or.inr h_is_aug
-
+  · exact Or.inr h_is_aug
 
 private lemma mem_isAUG {rna : List RNABase} :
     ∀ (idx : Nat) (rem : List RNABase) (acc : List (Nat × Nat)),
@@ -652,17 +636,13 @@ private lemma mem_isAUG {rna : List RNABase} :
   induction rem with
   | nil =>
     intro idx acc _ hp
-    -- aux returns acc.reverse when remaining = []
     exact Or.inl (by simpa [aux, List.mem_reverse] using hp)
   | cons a rem' ih =>
     intro idx acc hdrop hp
-    -- Split on the length of the tail to mirror aux's pattern matching.
     cases rem' with
     | nil =>
-      -- rem = [a]; aux takes the _ :: rest branch, rest = []
       have hp' : (p, s) ∈ aux rna (idx + 1) [] acc := by
         simpa [aux] using hp
-      -- rna.drop (idx+1) = []
       have hdrop' : rna.drop (idx + 1) = [] := by
         have hcons : rna.drop idx = a :: ([] : List RNABase) := by simpa using hdrop
         exact List.drop_succ_of_drop_cons hcons
@@ -670,22 +650,16 @@ private lemma mem_isAUG {rna : List RNABase} :
     | cons b rem'' =>
       cases rem'' with
       | nil =>
-        -- rem = a :: b :: []; aux takes the _ :: rest branch with rest = [b]
         have hp' : (p, s) ∈ aux rna (idx + 1) [b] acc := by
           simpa [aux] using hp
-        -- rna.drop (idx+1) = [b]
         have hdrop' : rna.drop (idx + 1) = [b] := by
           have hcons : rna.drop idx = a :: b :: ([] : List RNABase) := by simpa using hdrop
           exact List.drop_succ_of_drop_cons hcons
         exact ih (idx + 1) acc hdrop' hp'
       | cons c rest =>
-        -- rem = a :: b :: c :: rest
-        -- Distinguish AUG vs non-AUG via a boolean split; simp will route aux accordingly.
         by_cases hAUG : (a = .A ∧ b = .U ∧ c = .G)
-        · -- AUG case: aux pushes (idx, score) and recurses on (.U :: .G :: rest)
-          rcases hAUG with ⟨hA, hU, hG⟩
+        · rcases hAUG with ⟨hA, hU, hG⟩
           subst hA; subst hU; subst hG
-          -- From hp, expose the recursive membership with the new head pushed.
           have hp' :
               (p, s) ∈
                 aux rna (idx + 1) (.U :: .G :: rest)
@@ -694,11 +668,9 @@ private lemma mem_isAUG {rna : List RNABase} :
                         ((rna.drop (if idx ≥ 3 then idx - 3 else 0)).take
                           ((idx - if idx ≥ 3 then idx - 3 else 0) + 3 + min 5 rest.length))) :: acc) := by
             simpa [aux] using hp
-          -- rna.drop idx = .A :: .U :: .G :: rest  and rna.drop (idx+1) = .U :: .G :: rest
           have hhead : rna.drop idx = .A :: .U :: .G :: rest := by simpa using hdrop
           have hdrop' : rna.drop (idx + 1) = .U :: .G :: rest :=
             List.drop_succ_of_drop_cons (by simpa using hhead)
-          -- Apply IH to the recursive call with the pushed head accumulator.
           have hind :
               (p, s) ∈
                 ((idx,
@@ -712,16 +684,12 @@ private lemma mem_isAUG {rna : List RNABase} :
                      ((rna.drop (if idx ≥ 3 then idx - 3 else 0)).take
                        ((idx - if idx ≥ 3 then idx - 3 else 0) + 3 + min 5 rest.length))) :: acc)
                hdrop' hp'
-          -- Peel the pushed head via the AUG-head helper lemma.
           exact mem_isAUG_cons_AUG (rna := rna) (idx := idx) (acc := acc) (p := p) (s := s)
             hhead hp' hind
-        · -- Non-AUG case: aux recurses on (b :: c :: rest) without pushing.
-          have hp' : (p, s) ∈ aux rna (idx + 1) (b :: c :: rest) acc := by
-            -- Rewrite the one-step unfold of aux on a non-AUG head explicitly.
+        · have hp' : (p, s) ∈ aux rna (idx + 1) (b :: c :: rest) acc := by
             have step :
                 aux rna idx (a :: b :: c :: rest) acc =
                 aux rna (idx + 1) (b :: c :: rest) acc := by
-              -- Discharge by cases on (a,b,c) against (A,U,G)
               by_cases hA : a = .A
               · subst hA
                 by_cases hU : b = .U
@@ -732,20 +700,18 @@ private lemma mem_isAUG {rna : List RNABase} :
                 · simp [aux, hU]
               · simp [aux, hA]
             simpa [step] using hp
-          -- rna.drop (idx+1) = b :: c :: rest
           have hdrop' : rna.drop (idx + 1) = b :: c :: rest := by
             have hcons : rna.drop idx = a :: b :: c :: rest := by simpa using hdrop
             exact List.drop_succ_of_drop_cons hcons
           exact ih (idx + 1) acc hdrop' hp' --
+          
 end findAndScoreStartCodons
 
 -- Corollary for the top-level function: any picked index points to AUG.
 lemma findAndScoreStartCodons_mem_AUG {rna : List RNABase} {p s : Nat}
     (hmem : (p, s) ∈ findAndScoreStartCodons rna) :
     ∃ rest, rna.drop p = .A :: .U :: .G :: rest := by
-  -- findAndScoreStartCodons rna = aux rna 0 rna []
   have := findAndScoreStartCodons.mem_isAUG (rna := rna) 0 rna [] rfl p s (by
-    -- expose the aux call producing the result
     simpa [findAndScoreStartCodons])
   exact this.elim (fun hinAcc => False.elim (by cases hinAcc)) id
 
@@ -753,7 +719,7 @@ lemma findAndScoreStartCodons_mem_AUG {rna : List RNABase} {p s : Nat}
 def findStartCodon (mrna : Bio.Sequence.MRNA) : Option Nat :=
   let coding_seq := mrna.seq.drop mrna.five_utr_length
   let candidates := findAndScoreStartCodons coding_seq
-  -- Select best scoring, or first if tie, using the shared chooser
+  -- Selects best scoring, or first if tie, using the shared chooser
   let best := candidates.foldl chooseBest none
   best.map (·.1)
 
@@ -763,7 +729,6 @@ lemma findStartCodon_is_AUG_simple
     (m.seq.drop (m.five_utr_length + i)).take 3 = [.A, .U, .G] := by
   unfold findStartCodon at h
   set coding_seq := m.seq.drop m.five_utr_length with hseq
-  -- candidates
   set candidates := findAndScoreStartCodons coding_seq with hcand
   have hbestFoldMap :
       (candidates.foldl chooseBest none).map (·.1) = some i := by
@@ -787,11 +752,10 @@ lemma findStartCodon_is_AUG_simple
 Identifies the translatable coding sequence (CDS) within an MRNA by finding
 the best start codon (via Kozak scoring) and the first subsequent in-frame
 stop codon.
-
 Returns `none` if no suitable start/stop codons are found.
 -/
 def processMRNA (mrna : RawMRNA) : Option ProcessedMRNA :=
-  match hstart : findStartCodon { seq := mrna.seq } with -- treat five_utr_length = 0 here
+  match hstart : findStartCodon { seq := mrna.seq } with 
   | none => none
   | some startPos =>
     let potential_cds := mrna.seq.drop startPos
@@ -809,7 +773,6 @@ def processMRNA (mrna : RawMRNA) : Option ProcessedMRNA :=
           coding_region := potential_cds.take cds_len
           three_utr     := potential_cds.drop cds_len
           h_is_cds      := by
-            -- From the pick, the first three bases at the start position are AUG.
             have hpick : findStartCodon { seq := mrna.seq } = some startPos := hstart
             have hAUG_at_start :
                 (mrna.seq.drop (0 + startPos)).take 3 = [.A, .U, .G] := by
@@ -817,18 +780,13 @@ def processMRNA (mrna : RawMRNA) : Option ProcessedMRNA :=
                 (findStartCodon_is_AUG_simple
                   ({ seq := mrna.seq, five_utr_length := 0, three_utr_length := 0 })
                   (i := startPos) hpick)
-            -- Convert that to potential_cds.take 3
             have hAUG_potential : (potential_cds.take 3) = [.A, .U, .G] := by
-              -- potential_cds = mrna.seq.drop startPos
               simpa [potential_cds, Nat.zero_add] using hAUG_at_start
-            -- Show 3 ≤ cds_len so that take 3 (take cds_len l) = take 3 l.
             have h_count_pos : 1 ≤ cds_codon_count := by
               exact Nat.succ_le_succ (Nat.zero_le _)
             have h3le : 3 ≤ cds_len := by
-              -- 1*3 ≤ cds_codon_count*3
               have := Nat.mul_le_mul_right 3 h_count_pos
               simpa [cds_len, Nat.one_mul] using this
-            -- Now rewrite with take_take and min_eq_left.
             calc
               (potential_cds.take cds_len).take 3
                   = potential_cds.take (min 3 cds_len) := by
@@ -875,28 +833,24 @@ def translate (coding_region : List RNABase) : List AminoAcid :=
 
 open Classical
 
-/-- REFACTORED splice function, now driven by the `SpliceSiteSignature` structure. -/
+/-- Splice function,  driven by the `SpliceSiteSignature` structure. -/
 private def spliceAndCheck (gene : Gene) (pre_mrna : List RNABase) :
     List GenomicRegion → List RNABase → Option (List RNABase)
   | [], acc => some acc
   | r :: rs, acc =>
-    -- Use the modular splice site definitions
     let acceptor_len := gene.splice_sites.acceptorSite.length
     let donor_len := gene.splice_sites.donorSite.length
-
     let acceptor_ok : Bool :=
       acc.isEmpty ||
         (r.start ≥ acceptor_len && -- Prevent underflow
          decide
           (((gene.coding_strand.seq.drop (r.start - acceptor_len)).take acceptor_len)
             = gene.splice_sites.acceptorSite))
-
     let donor_ok : Bool :=
       rs.isEmpty ||
         decide
           (((gene.coding_strand.seq.drop r.end_).take donor_len)
             = gene.splice_sites.donorSite)
-
     if acceptor_ok && donor_ok then
       let spliced_segment := pre_mrna.drop r.start |>.take r.length
       spliceAndCheck gene pre_mrna rs (acc ++ spliced_segment)
@@ -904,7 +858,7 @@ private def spliceAndCheck (gene : Gene) (pre_mrna : List RNABase) :
       none
 
 /--
-REVISED: Produces a mature mRNA by transcribing and splicing.
+Produces a mature mRNA by transcribing and splicing.
 This version checks for canonical splice sites (e.g., GT-AG).
 -/
 def splice (gene : Gene) : Option RawMRNA :=
@@ -913,7 +867,7 @@ def splice (gene : Gene) : Option RawMRNA :=
 
 /-
 /--
-REVISED: Produces a mature mRNA by transcribing and splicing.
+Produces a mature mRNA by transcribing and splicing.
 This version checks for canonical splice sites (e.g., GT-AG). If a splice site
 is mutated, splicing fails, returning `none`. This is critical for modeling
 splice-site defects correctly.
@@ -949,7 +903,7 @@ def splice' (gene : Gene) : Option RawMRNA :=
   -/
 
 /--
-NEW: Splicing based on a specific isoform, demonstrating the utility of the
+Splicing based on a specific isoform, demonstrating the utility of the
 `SpliceIsoform` structure and modeling alternative splicing.
 -/
 def spliceIsoform (iso : SpliceIsoform) : Option RawMRNA :=
@@ -965,20 +919,18 @@ def spliceIsoform (iso : SpliceIsoform) : Option RawMRNA :=
   some { seq := mature_seq }
 
 /--
-The complete, revised pipeline from gene to protein, now using the robust
-splicing function. This pipeline can now fail at the splicing step.
+The complete, revised pipeline from gene to protein, using the
+splicing function. This pipeline can  fail at the splicing step.
 -/
 def synthesizeProtein (gene : Gene) : Option (List AminoAcid) :=
   let mrna? := splice gene
   mrna?.bind (fun mrna =>
-    (processMRNA mrna).map (fun p => translate p.coding_region)
-  )
+    (processMRNA mrna).map (fun p => translate p.coding_region))
 
--- NEW: A pipeline for a specific splice isoform.
+-- A pipeline for a specific splice isoform.
 def synthesizeProteinFromIsoform (iso : SpliceIsoform) : Option (List AminoAcid) :=
   (spliceIsoform iso).bind (fun mrna =>
-    (processMRNA mrna).map (fun p => translate p.coding_region)
-  )
+    (processMRNA mrna).map (fun p => translate p.coding_region))
 
 lemma synthesizeProtein_eq_some_of_processed
     (g : Gene) {raw : RawMRNA} {p : ProcessedMRNA}
@@ -989,7 +941,7 @@ lemma synthesizeProtein_eq_some_of_processed
 
 end Bio.Genetics
 
--- Section 5: Complete Mutation Analysis with Length-Altering Support
+/- ### Section 5: Complete Mutation Analysis with Length-Altering Support-/
 namespace Bio.Mutation
 
 open Bio Bio.Sequence Bio.Genetics List
@@ -1159,11 +1111,8 @@ private lemma impossible_inside_before
     (h_rel : r1.end_ ≤ r2.start)
     (h1_in : r1.start < pos ∧ pos < r1.end_)
     (h2_before : r2.end_ ≤ pos) : False := by
-  -- From r2.start < r2.end_ ≤ pos, get r2.start < pos
   have h2_start_lt_pos : r2.start < pos := lt_of_lt_of_le r2.h_valid h2_before
-  -- From pos < r1.end_ ≤ r2.start, get pos < r2.start
   have hpos_lt_r2start : pos < r2.start := lt_of_lt_of_le h1_in.2 h_rel
-  -- Contradiction: pos < r2.start < pos
   have hcontr : pos < pos := lt_trans hpos_lt_r2start h2_start_lt_pos
   exact (lt_irrefl _ hcontr)
 
@@ -1188,91 +1137,63 @@ lemma chain'_map_shift_preserve
     (h_chain : List.Chain' (fun r1 r2 => r1.end_ ≤ r2.start) regions) :
     List.Chain' (fun r1 r2 => r1.end_ ≤ r2.start)
       (regions.map (fun r => shiftRegionAfterNat pos shift r)) := by
-  -- Relation alias with explicit type to help field-notation inference
   let R : GenomicRegion → GenomicRegion → Prop := fun r1 r2 => r1.end_ ≤ r2.start
   have h_chain' : List.Chain' R regions := h_chain
   induction regions with
   | nil =>
-    simp [R]
+    simp
   | cons r rs ih =>
     cases rs with
     | nil =>
-      simp [R]
+      simp
     | cons r' rs' =>
-      -- regions = r :: r' :: rs'
       cases h_chain' with
       | cons h_rel h_tail =>
         constructor
-        · -- head relation after map
-          -- Split on the three-way case analysis for each region via the if-then-else in shiftRegionAfterNat
-          -- r: after/inside/before relative to pos
-          by_cases h1_after : pos ≤ r.start
-          · -- r after pos
-            -- r': after/inside/before
-            by_cases h2_after : pos ≤ r'.start
-            · -- r' after pos: both sides add `shift`
-              have : r.end_ + shift ≤ r'.start + shift := Nat.add_le_add_right h_rel shift
+        · by_cases h1_after : pos ≤ r.start
+          · by_cases h2_after : pos ≤ r'.start
+            · have : r.end_ + shift ≤ r'.start + shift := Nat.add_le_add_right h_rel shift
               simpa [R, shiftRegionAfterNat, h1_after, h2_after] using this
-            · -- not (pos ≤ r'.start)
-              have h2_not_after : ¬ pos ≤ r'.start := h2_after
+            · have h2_not_after : ¬ pos ≤ r'.start := h2_after
               by_cases h2_inside : pos < r'.end_
-              · -- r' inside: impossible with r after and sortedness
-                have h2_start_lt_pos : r'.start < pos := Nat.lt_of_not_ge h2_not_after
+              · have h2_start_lt_pos : r'.start < pos := Nat.lt_of_not_ge h2_not_after
                 have h_pos_lt_rend : pos < r.end_ := lt_of_le_of_lt h1_after r.h_valid
                 have h_pos_lt_r2start : pos < r'.start := lt_of_lt_of_le h_pos_lt_rend h_rel
                 have hcontr : pos < pos := lt_trans h_pos_lt_r2start h2_start_lt_pos
                 exact (lt_irrefl _ hcontr).elim
-              · -- r' before pos: impossible with r after and sortedness
-                -- From ¬ pos ≤ r'.start we have r'.start < pos
-                have h2_start_lt_pos : r'.start < pos := Nat.lt_of_not_ge h2_not_after
+              · have h2_start_lt_pos : r'.start < pos := Nat.lt_of_not_ge h2_not_after
                 have h_pos_lt_rend : pos < r.end_ := lt_of_le_of_lt h1_after r.h_valid
                 have h_pos_lt_r2start : pos < r'.start := lt_of_lt_of_le h_pos_lt_rend h_rel
                 have hcontr : pos < pos := lt_trans h_pos_lt_r2start h2_start_lt_pos
                 exact (lt_irrefl _ hcontr).elim
-          · -- r not after
-            have h1_not_after : ¬ pos ≤ r.start := h1_after
+          · have h1_not_after : ¬ pos ≤ r.start := h1_after
             by_cases h1_inside : pos < r.end_
-            · -- r inside pos
-              -- r': after/inside/before
-              by_cases h2_after : pos ≤ r'.start
-              · -- r' after pos: both ends add `shift` on the right; left adds `shift`
-                have : r.end_ + shift ≤ r'.start + shift := Nat.add_le_add_right h_rel shift
+            · by_cases h2_after : pos ≤ r'.start
+              · have : r.end_ + shift ≤ r'.start + shift := Nat.add_le_add_right h_rel shift
                 simpa [R, shiftRegionAfterNat, h1_not_after, h1_inside, h2_after] using this
-              · -- r' not after
-                have h2_not_after : ¬ pos ≤ r'.start := h2_after
+              · have h2_not_after : ¬ pos ≤ r'.start := h2_after
                 by_cases h2_inside : pos < r'.end_
-                · -- r' inside pos: impossible with sortedness (cannot both contain pos)
-                  have h2_start_lt_pos : r'.start < pos := Nat.lt_of_not_ge h2_not_after
+                · have h2_start_lt_pos : r'.start < pos := Nat.lt_of_not_ge h2_not_after
                   have h_pos_lt_r2start : pos < r'.start := lt_of_lt_of_le h1_inside h_rel
                   have hcontr : pos < pos := lt_trans h_pos_lt_r2start h2_start_lt_pos
                   exact (lt_irrefl _ hcontr).elim
-                · -- r' before pos: impossible with r inside and sortedness
-                  -- not inside ⇒ ¬ pos < r'.end_ ⇒ r'.end_ ≤ pos (via le_of_not_gt)
-                  have h2_before : r'.end_ ≤ pos := le_of_not_gt (by simpa [gt_iff_lt] using h2_inside)
+                · have h2_before : r'.end_ ≤ pos := le_of_not_gt (by simpa [gt_iff_lt] using h2_inside)
                   have h2_start_lt_pos : r'.start < pos := Nat.lt_of_not_ge h2_not_after
                   have hcontr : pos < pos :=
                     lt_trans (lt_of_lt_of_le h1_inside h_rel) h2_start_lt_pos
                   exact (lt_irrefl _ hcontr).elim
-            · -- r before pos: pos ≥ r.end_
-              -- not inside ⇒ ¬ pos < r.end_ ⇒ r.end_ ≤ pos
-              have h1_before : r.end_ ≤ pos := le_of_not_gt (by simpa [gt_iff_lt] using h1_inside)
-              -- r': after/inside/before
+            · have h1_before : r.end_ ≤ pos := le_of_not_gt (by simpa [gt_iff_lt] using h1_inside)
               by_cases h2_after : pos ≤ r'.start
-              · -- r' after: right start adds `shift`, left unchanged ⇒ r.end_ ≤ r'.start + shift
-                have : r.end_ ≤ r'.start := h_rel
+              · have : r.end_ ≤ r'.start := h_rel
                 have : r.end_ ≤ r'.start + shift := le_add_right this
                 simpa [R, shiftRegionAfterNat, h1_not_after, h1_inside, h2_after] using this
-              · -- r' not after
-                have h2_not_after : ¬ pos ≤ r'.start := h2_after
+              · have h2_not_after : ¬ pos ≤ r'.start := h2_after
                 by_cases h2_inside : pos < r'.end_
-                · -- r' inside: right start unchanged, left unchanged ⇒ r.end_ ≤ r'.start
-                  have : r.end_ ≤ r'.start := h_rel
+                · have : r.end_ ≤ r'.start := h_rel
                   simpa [R, shiftRegionAfterNat, h1_not_after, h1_inside, h2_not_after, h2_inside] using this
-                · -- r' before: both unchanged ⇒ r.end_ ≤ r'.start
-                  have : r.end_ ≤ r'.start := h_rel
+                · have : r.end_ ≤ r'.start := h_rel
                   simpa [R, shiftRegionAfterNat, h1_not_after, h1_inside, h2_not_after, h2_inside] using this
-        · -- tail: recurse
-          apply ih
+        · apply ih
           exact h_tail
           aesop
 
@@ -1307,10 +1228,8 @@ lemma List.drop_one_eq_tail {α : Type*} (l : List α) : l.drop 1 = l.tail := by
 lemma drop_succ_of_drop_cons {rna : List RNABase} {idx : Nat} {a : RNABase} {l : List RNABase}
     (h : rna.drop idx = a :: l) : rna.drop (idx + 1) = l := by
   have h₁ : rna.drop (idx + 1) = (rna.drop idx).drop 1 := by
-    -- drop (idx+1) = drop 1 (drop idx)
     simp
   have h₂ : (rna.drop idx).drop 1 = l := by
-    -- push drop 1 through the known cons
     have := congrArg (fun t => t.drop 1) h
     simpa using this
   calc
@@ -1322,28 +1241,25 @@ lemma aug_at_of_drop_AUG {rna : List RNABase} {idx : Nat} {rest : List RNABase}
     (h : rna.drop idx = .A :: .U :: .G :: rest) :
     idx + 2 < rna.length ∧
     rna[idx]! = .A ∧ rna[idx+1]! = .U ∧ rna[idx+2]! = .G := by
-  -- bounds
   have hlen3 : (rna.drop idx).length ≥ 3 := by simp [h]
   have hlt : idx + 2 < rna.length := by
     have : 3 ≤ rna.length - idx := by simpa [List.length_drop] using hlen3
     omega
-  -- derive get? facts from the drop equality, then convert to get!
   have h0opt : rna[idx]? = some .A := by
     have hL : (rna.drop idx)[0]? = some .A := by simp [h]
     have hR : (rna.drop idx)[0]? = rna[idx]? := by
-      simp [Nat.add_zero]
+      simp
     exact (Eq.trans hR.symm hL)
   have h1opt : rna[idx+1]? = some .U := by
     have hL : (rna.drop idx)[1]? = some .U := by simp [h]
     have hR : (rna.drop idx)[1]? = rna[idx+1]? := by
-      simp [Nat.one_add, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]
+      simp
     exact (Eq.trans hR.symm hL)
   have h2opt : rna[idx+2]? = some .G := by
     have hL : (rna.drop idx)[2]? = some .G := by simp [h]
     have hR : (rna.drop idx)[2]? = rna[idx+2]? := by
-      simp [Nat.add_comm, Nat.add_left_comm, Nat.add_assoc]
+      simp
     aesop
-  -- bases via get!
   have h0 : rna[idx]! = .A := by
     simp [getElem!_eq_getElem?_getD, h0opt]
   have h1 : rna[idx+1]! = .U := by
@@ -1351,7 +1267,6 @@ lemma aug_at_of_drop_AUG {rna : List RNABase} {idx : Nat} {rest : List RNABase}
   have h2 : rna[idx+2]! = .G := by
     simp [getElem!_eq_getElem?_getD, h2opt]
   exact ⟨hlt, h0, h1, h2⟩
-
 
 lemma augScanAux_cons_len1_eq (idx : Nat) (a : RNABase) (acc : List Nat) :
   augScanAux idx [a] acc = augScanAux (idx + 1) [] acc := by
@@ -1371,7 +1286,6 @@ lemma augScanAux_cons_nonAUG_eq (idx : Nat) (a b c : RNABase) (rest : List RNABa
     (h_not : ¬(a = .A ∧ b = .U ∧ c = .G)) :
   augScanAux idx (a :: b :: c :: rest) acc =
     augScanAux (idx + 1) (b :: c :: rest) acc := by
-  -- Discharge by cases on (a,b,c) against (A,U,G)
   by_cases hA : a = .A
   · subst hA
     by_cases hU : b = .U
@@ -1400,10 +1314,8 @@ lemma augScanAux_mem_spec {rna : List RNABase} :
     exact Or.inl this
   | cons a tl ih =>
     intro idx acc hdrop hp
-    -- Split on tail length to mirror augScanAux branches
     cases tl with
     | nil =>
-      -- l = [a]
       have hdrop' : rna.drop (idx + 1) = [] := by
         have : rna.drop idx = a :: ([] : List RNABase) := by simpa using hdrop
         exact drop_succ_of_drop_cons (rna := rna) (idx := idx) (a := a) (l := []) this
@@ -1413,7 +1325,6 @@ lemma augScanAux_mem_spec {rna : List RNABase} :
     | cons b tl' =>
       cases tl' with
       | nil =>
-        -- l = a :: b :: []
         have hdrop' : rna.drop (idx + 1) = [b] := by
           have : rna.drop idx = a :: [b] := by simpa using hdrop
           exact drop_succ_of_drop_cons (rna := rna) (idx := idx) (a := a) (l := [b]) this
@@ -1421,29 +1332,23 @@ lemma augScanAux_mem_spec {rna : List RNABase} :
           simpa [augScanAux_cons_len2_eq] using hp
         simpa using ih (idx + 1) acc hdrop' hp'
       | cons c rest =>
-        -- l = a :: b :: c :: rest
         by_cases hA : a = .A
         · by_cases hU : b = .U
           · by_cases hG : c = .G
-            · -- AUG at head
-              have h_head : rna.drop idx = .A :: .U :: .G :: rest := by
+            · have h_head : rna.drop idx = .A :: .U :: .G :: rest := by
                 simpa [hA, hU, hG] using hdrop
               have hdropUG : rna.drop (idx + 1) = .U :: .G :: rest :=
                 drop_succ_of_drop_cons (rna := rna) (idx := idx) (a := .A) (l := .U :: .G :: rest) h_head
-              -- rewrite to match IH's expected tail: b :: c :: rest
               have hdrop' : rna.drop (idx + 1) = b :: c :: rest := by
                 simpa [hU, hG] using hdropUG
               have hpUG : p ∈ augScanAux (idx + 1) (.U :: .G :: rest) (idx :: acc) := by
                 simpa [augScanAux_cons_AUG_eq, hA, hU, hG] using hp
-              -- rewrite membership to match IH's expected tail: b :: c :: rest
               have hp' : p ∈ augScanAux (idx + 1) (b :: c :: rest) (idx :: acc) := by
                 simpa [hU, hG] using hpUG
-              -- recurse
               have h_rec := ih (idx + 1) (idx :: acc) hdrop' hp'
               rcases h_rec with h_in_acc | h_prop
               · cases List.mem_cons.mp h_in_acc with
                 | inl p_eq_idx =>
-                  -- derive AUG-at-p without eliminating idx to avoid identifier issues
                   have h_at : p + 2 < rna.length ∧
                               rna[p]! = .A ∧ rna[p+1]! = .U ∧ rna[p+2]! = .G := by
                     have h_idx := aug_at_of_drop_AUG (rna := rna) (idx := idx) (rest := rest) h_head
@@ -1452,35 +1357,28 @@ lemma augScanAux_mem_spec {rna : List RNABase} :
                 | inr p_in_acc =>
                   exact Or.inl p_in_acc
               · exact Or.inr h_prop
-            · -- not G
-              have hdrop' : rna.drop (idx + 1) = b :: c :: rest := by
+            · have hdrop' : rna.drop (idx + 1) = b :: c :: rest := by
                 have hx : rna.drop idx = a :: b :: c :: rest := by simpa using hdrop
                 exact drop_succ_of_drop_cons (rna := rna) (idx := idx) (a := a) (l := b :: c :: rest) hx
-              -- non-AUG witness
               have h_not : ¬(a = .A ∧ b = .U ∧ c = .G) := by
                 intro h; exact hG h.2.2
               have step := augScanAux_cons_nonAUG_eq idx a b c rest acc h_not
               have hp' : p ∈ augScanAux (idx + 1) (b :: c :: rest) acc := by
-                -- orient equality the right way for the goal
                 subst hU hA
-                simp_all only [getElem!_eq_getElem?_getD, and_false, not_false_eq_true]--simpa [←step, hA, hU] using hp
+                simp_all only [getElem!_eq_getElem?_getD, and_false, not_false_eq_true]
               simpa using ih (idx + 1) acc hdrop' hp'
-          · -- not U
-            have hdrop' : rna.drop (idx + 1) = b :: c :: rest := by
+          · have hdrop' : rna.drop (idx + 1) = b :: c :: rest := by
               have hx : rna.drop idx = a :: b :: c :: rest := by simpa using hdrop
               exact drop_succ_of_drop_cons (rna := rna) (idx := idx) (a := a) (l := b :: c :: rest) hx
-            -- non-AUG witness
             have h_not : ¬(a = .A ∧ b = .U ∧ c = .G) := by
               intro h; exact hU h.2.1
             have step := augScanAux_cons_nonAUG_eq idx a b c rest acc h_not
             have hp' : p ∈ augScanAux (idx + 1) (b :: c :: rest) acc := by
               simpa [←step, hA] using hp
             simpa using ih (idx + 1) acc hdrop' hp'
-        · -- not A
-          have hdrop' : rna.drop (idx + 1) = b :: c :: rest := by
+        · have hdrop' : rna.drop (idx + 1) = b :: c :: rest := by
             have hx : rna.drop idx = a :: b :: c :: rest := by simpa using hdrop
             exact drop_succ_of_drop_cons (rna := rna) (idx := idx) (a := a) (l := b :: c :: rest) hx
-          -- non-AUG witness
           have h_not : ¬(a = .A ∧ b = .U ∧ c = .G) := by
             intro h; exact hA h.1
           have step := augScanAux_cons_nonAUG_eq idx a b c rest acc h_not
@@ -1493,7 +1391,6 @@ lemma augPositions_mem_spec {rna : List RNABase} {p : Nat}
     (hp : p ∈ augPositions rna) :
     p + 2 < rna.length ∧
     rna[p]! = .A ∧ rna[p+1]! = .U ∧ rna[p+2]! = .G := by
-  -- augPositions rna = augScanAux 0 rna []
   have h := augScanAux_mem_spec (rna := rna) 0 rna [] rfl p (by simpa [augPositions])
   rcases h with h_in_empty | h_aug
   · cases h_in_empty
@@ -1507,20 +1404,16 @@ lemma Int.toNat_add_ofNat (a b : Nat) :
 /-- A helper to expose the pure Nat version of the region shift used for insertions. -/
 def shiftRegionAfterNat (pos shift : Nat) (r : GenomicRegion) : GenomicRegion :=
   if h_all : pos ≤ r.start then
-    -- Entire region occurs after the insertion site: shift both ends.
     { r with
       start := r.start + shift
       end_  := r.end_  + shift
       h_valid := Nat.add_lt_add_right r.h_valid shift }
   else if h_part : pos < r.end_ then
-    -- Insertion lands inside this region: extend the end.
     { r with
       end_ := r.end_ + shift
       h_valid := by
-        -- r.start < r.end_ ≤ r.end_ + shift
         exact lt_of_lt_of_le r.h_valid (Nat.le_add_right _ _) }
   else
-    -- Completely before the insertion: unchanged.
     r
 
 /-- On a singleton list, the nonnegative shift agrees with the Nat-side mapper. -/
@@ -1528,10 +1421,8 @@ lemma shiftRegionsAfter_nonneg_eq_map_singleton
     (pos shift : Nat) (r : GenomicRegion) :
     shiftRegionsAfter pos (shift : Int) [r] =
       [shiftRegionAfterNat pos shift r] := by
-  -- Compute by cases on the three branches for r
   by_cases h_all : pos ≤ r.start
-  · -- Branch ❶: r fully after pos
-    have h_newStart_nonneg : 0 ≤ ((r.start : Int) + shift) := by
+  · have h_newStart_nonneg : 0 ≤ ((r.start : Int) + shift) := by
       have : (0 : Int) ≤ (r.start : Int) := by exact_mod_cast Nat.zero_le _
       exact add_nonneg this (by exact_mod_cast Nat.zero_le shift)
     have h_newEnd_nonneg : 0 ≤ ((r.end_ : Int) + shift) := by
@@ -1549,11 +1440,9 @@ lemma shiftRegionsAfter_nonneg_eq_map_singleton
       simpa using Int.toNat_add_ofNat r.start shift
     have hend : ((r.end_ : Int) + shift).toNat = r.end_ + shift := by
       simpa using Int.toNat_add_ofNat r.end_ shift
-    simp [shiftRegionsAfter, shiftRegionAfterNat, h_all, h_guard, hstart, hend, h_ok]
-  · -- not h_all
-    by_cases h_part : pos < r.end_
-    · -- Branch ❷: pos inside r
-      have h_gt : (r.start : Int) < (r.end_ : Int) + shift := by
+    simp [shiftRegionsAfter, shiftRegionAfterNat, h_all, h_guard, hstart, hend]
+  · by_cases h_part : pos < r.end_
+    · have h_gt : (r.start : Int) < (r.end_ : Int) + shift := by
         have h0 : (r.start : Int) < (r.end_ : Int) := by exact_mod_cast r.h_valid
         have h_le : (r.end_ : Int) ≤ (r.end_ : Int) + shift :=
           le_add_of_nonneg_right (by exact_mod_cast Nat.zero_le shift)
@@ -1567,9 +1456,8 @@ lemma shiftRegionsAfter_nonneg_eq_map_singleton
         have : (r.start : Int) < ((r.end_ : Int) + shift).toNat := by
           simpa [Int.toNat_of_nonneg h_nonneg] using h_gt
         exact_mod_cast this
-      simp [shiftRegionsAfter, shiftRegionAfterNat, h_all, h_part, h_gt, hend, h_valid_nat]
-    · -- Branch ❸: r before pos
-      simp [shiftRegionsAfter, shiftRegionAfterNat, h_all, h_part]
+      simp [shiftRegionsAfter, shiftRegionAfterNat, h_all, h_part, h_gt, hend]
+    · simp [shiftRegionsAfter, shiftRegionAfterNat, h_all, h_part]
 
 /-- For nonnegative shifts, the head of a cons always survives, so we can peel it as an append. -/
 lemma shiftRegionsAfter_nonneg_cons_eq_append
@@ -1577,10 +1465,8 @@ lemma shiftRegionsAfter_nonneg_cons_eq_append
     shiftRegionsAfter pos (shift : Int) (r :: rs) =
       shiftRegionsAfter pos (shift : Int) [r] ++
       shiftRegionsAfter pos (shift : Int) rs := by
-  -- Evaluate head by cases (it never drops for nonnegative shift)
   by_cases h_all : pos ≤ r.start
-  ·
-    have h_newStart_nonneg : 0 ≤ ((r.start : Int) + shift) := by
+  · have h_newStart_nonneg : 0 ≤ ((r.start : Int) + shift) := by
       have : (0 : Int) ≤ (r.start : Int) := by exact_mod_cast Nat.zero_le _
       exact add_nonneg this (by exact_mod_cast Nat.zero_le shift)
     have h_newEnd_nonneg : 0 ≤ ((r.end_ : Int) + shift) := by
@@ -1592,19 +1478,16 @@ lemma shiftRegionsAfter_nonneg_cons_eq_append
       · exact h_newStart_nonneg
       · have : (r.end_ : Int) > (r.start : Int) := by exact_mod_cast r.h_valid
         exact add_lt_add_right this shift
-    simp [shiftRegionsAfter, h_all, h_ok, List.singleton, List.append]
+    simp [shiftRegionsAfter]
     aesop
-  ·
-    by_cases h_part : pos < r.end_
-    ·
-      have h_gt : (r.start : Int) < (r.end_ : Int) + shift := by
+  · by_cases h_part : pos < r.end_
+    · have h_gt : (r.start : Int) < (r.end_ : Int) + shift := by
         have h0 : (r.start : Int) < (r.end_ : Int) := by exact_mod_cast r.h_valid
         have h_le : (r.end_ : Int) ≤ (r.end_ : Int) + shift :=
           le_add_of_nonneg_right (by exact_mod_cast Nat.zero_le shift)
         exact lt_of_lt_of_le h0 h_le
-      simp [shiftRegionsAfter, h_all, h_part, h_gt, List.singleton, List.append]
-    ·
-      simp [shiftRegionsAfter, h_all, h_part, List.singleton, List.append]
+      simp [shiftRegionsAfter, h_all, h_part, h_gt]
+    · simp [shiftRegionsAfter, h_all, h_part]
 
 /--
 For nonnegative shift (the insertion case), shiftRegionsAfter agrees with
@@ -1615,7 +1498,7 @@ lemma shiftRegionsAfter_nonneg_eq_map (pos shift : Nat) (regions : List GenomicR
       regions.map (shiftRegionAfterNat pos shift) := by
   induction regions with
   | nil =>
-      simp [shiftRegionsAfter, shiftRegionAfterNat]
+      simp [shiftRegionsAfter]
   | cons r rs ih =>
       calc
         shiftRegionsAfter pos (shift : Int) (r :: rs)
@@ -1625,7 +1508,6 @@ lemma shiftRegionsAfter_nonneg_eq_map (pos shift : Nat) (regions : List GenomicR
                   shiftRegionsAfter_nonneg_cons_eq_append pos shift r rs
         _ = [shiftRegionAfterNat pos shift r] ++
               shiftRegionsAfter pos (shift : Int) rs := by
-                -- rewrite the left operand of ++ using the singleton lemma
                 have h := shiftRegionsAfter_nonneg_eq_map_singleton pos shift r
                 simpa using
                   congrArg (fun t => t ++ shiftRegionsAfter pos (shift : Int) rs) h
@@ -1642,10 +1524,7 @@ lemma shiftRegionsAfter_preserves_sorted
     (h_sorted : List.Chain' (fun r1 r2 => r1.end_ ≤ r2.start) regions) :
     List.Chain' (fun r1 r2 => r1.end_ ≤ r2.start)
       (shiftRegionsAfter pos (shift : Int) regions) := by
-  -- Rewrite to Nat-map form, then reuse the Chain' preservation lemma over maps.
   have h_eq := shiftRegionsAfter_nonneg_eq_map pos shift regions
-  -- The map predicate is exactly the one used in `chain'_map_shift_preserves`.
-  -- We can now rewrite and apply that lemma.
   simpa [h_eq, shiftRegionAfterNat] using
     (chain'_map_shift_preserve (regions := regions) (pos := pos) (shift := shift) h_sorted)
 
@@ -1653,7 +1532,6 @@ lemma shiftRegionsAfter_preserves_sorted
 lemma length_after_insertion {α} (l ins : List α) (pos : Nat)
     (hpos : pos ≤ l.length) :
     (l.take pos ++ ins ++ l.drop pos).length = l.length + ins.length := by
-  -- Expand lengths; take has length pos (since pos ≤ l.length), drop has length l.length - pos
   have hlen :
       (l.take pos ++ ins ++ l.drop pos).length
         = pos + ins.length + (l.length - pos) := by
@@ -1663,16 +1541,12 @@ lemma length_after_insertion {α} (l ins : List α) (pos : Nat)
     (l.take pos ++ ins ++ l.drop pos).length
         = pos + ins.length + (l.length - pos) := hlen
     _ = pos + (ins.length + (l.length - pos)) := by
-        -- reassociate
         simp [Nat.add_assoc]
     _ = pos + ((l.length - pos) + ins.length) := by
-        -- commute inside
         simp [Nat.add_comm]
     _ = (pos + (l.length - pos)) + ins.length := by
-        -- reassociate
         simp [Nat.add_assoc]
     _ = l.length + ins.length := by
-        -- cancel pos with (l.length - pos) using hpos
         simpa using congrArg (fun t => t + ins.length) (Nat.add_sub_of_le hpos)
 
 /-- Exon boundedness is preserved after insertion (end_ ≤ new sequence length). -/
@@ -1684,19 +1558,14 @@ lemma shiftRegionsAfter_bounded_after_insertion
     let shifted_exons := shiftRegionsAfter pos (insLen : Int) gene.exons
     ∀ r' ∈ shifted_exons, r'.end_ ≤ mutated_seq.length := by
   intro insLen mutated_seq shifted_exons r' hr'
-  -- Work with the explicit definitions of the lets.
   change r' ∈ shiftRegionsAfter pos (insLen : Int) gene.exons at hr'
   change r'.end_ ≤ (gene.coding_strand.seq.take pos ++ bases ++ gene.coding_strand.seq.drop pos).length
-  -- Use the map characterization for nonnegative shift to pull back to an original exon.
   have h_eq := shiftRegionsAfter_nonneg_eq_map pos insLen gene.exons
   have hr'_map : r' ∈ gene.exons.map (shiftRegionAfterNat pos insLen) := by
     simpa [h_eq] using hr'
   rcases List.mem_map.1 hr'_map with ⟨r, hr_mem, hmap⟩
-  -- Bound original exon end
   have hr_bound := gene.h_exons_bounded r hr_mem
-  -- Replace r' with the mapped region
   subst hmap
-  -- New length equals original length + inserted length
   have hlen_base :
       (gene.coding_strand.seq.take pos ++ bases ++ gene.coding_strand.seq.drop pos).length
         = gene.coding_strand.seq.length + bases.length :=
@@ -1705,25 +1574,19 @@ lemma shiftRegionsAfter_bounded_after_insertion
       (gene.coding_strand.seq.take pos ++ bases ++ gene.coding_strand.seq.drop pos).length
         = gene.coding_strand.seq.length + insLen := by
     simpa [insLen] using hlen_base
-  -- Case analysis on the shift branches
   by_cases h_all : pos ≤ r.start
-  · -- Fully after pos: end_ = r.end_ + insLen
-    have hend : (shiftRegionAfterNat pos insLen r).end_ = r.end_ + insLen := by
+  · have hend : (shiftRegionAfterNat pos insLen r).end_ = r.end_ + insLen := by
       simp [shiftRegionAfterNat, h_all]
     aesop
   · by_cases h_part : pos < r.end_
-    · -- Partially overlapping: end_ = r.end_ + insLen
-      have hend : (shiftRegionAfterNat pos insLen r).end_ = r.end_ + insLen := by
+    · have hend : (shiftRegionAfterNat pos insLen r).end_ = r.end_ + insLen := by
         simp [shiftRegionAfterNat, h_all, h_part]
       aesop
-    · -- Completely before pos: unchanged end_ = r.end_
-      have hend : (shiftRegionAfterNat pos insLen r).end_ = r.end_ := by
+    · have hend : (shiftRegionAfterNat pos insLen r).end_ = r.end_ := by
         simp [shiftRegionAfterNat, h_all, h_part]
-      -- mutated length ≥ original length
       have h_ge_len :
           gene.coding_strand.seq.length
             ≤ (gene.coding_strand.seq.take pos ++ bases ++ gene.coding_strand.seq.drop pos).length := by
-        -- gene.len ≤ gene.len + insLen, then rewrite by hlen
         have : gene.coding_strand.seq.length ≤ gene.coding_strand.seq.length + insLen :=
           Nat.le_add_right _ _
         aesop
@@ -1783,7 +1646,6 @@ lemma length_after_deletion {α} (l : List α) (pos len : Nat)
     _ = pos + ((l.length - pos) - len) := by
           simp [Nat.sub_sub]
     _ = (pos + (l.length - pos)) - len := by
-          -- use add_sub_assoc with len ≤ l.length - pos
           have hlen_le : len ≤ l.length - pos := by
             have h' : pos + len ≤ pos + (l.length - pos) := by
               simpa [Nat.add_sub_of_le hpos] using h
@@ -1804,14 +1666,12 @@ lemma Int.toNat_sub_of_le (a b : Nat) (h : b ≤ a) :
 
 /-- If 0 ≤ (a : Int) - b, then b ≤ a (Nat). -/
 lemma nat_le_of_int_sub_nonneg {a b : Nat} (h : (0 : Int) ≤ ((a : Int) - b)) : b ≤ a := by
-  -- From a - b ≥ 0 we get b ≤ a in Int, then drop to Nat
   have : (b : Int) ≤ (a : Int) := by simpa [sub_nonneg] using h
   exact Int.ofNat_le.mp this
 
 /-- From a + b ≤ c we get a ≤ c - b. -/
 lemma le_sub_of_add_le {a b c : Nat} (h : a + b ≤ c) : a ≤ c - b := by
   have hb : b ≤ c := le_trans (Nat.le_add_left _ _) h
-  -- Use standard equivalence: a ≤ c - b ↔ a + b ≤ c (under b ≤ c)
   exact (Nat.le_sub_iff_add_le hb).mpr h
 
 /-- After-case extractor for `shiftRegionsAfter` with negative shift:
@@ -1826,7 +1686,6 @@ lemma shiftRegionsAfter_after_case_end_toNat_eq
         let newEnd   : Int := (r.end_  : Int) + (-(len : Int))
         if h_ok : newStart ≥ 0 ∧ newEnd > newStart then
           let h_valid : newStart.toNat < newEnd.toNat := by
-            -- this proof exists inside the original definition; we won't need it externally
             have : (newStart.toNat : Int) < (newEnd.toNat : Int) := by
               have h₁ : (newStart.toNat : Int) = newStart := by
                 simp [Int.toNat_of_nonneg h_ok.1]
@@ -1856,15 +1715,12 @@ lemma shiftRegionsAfter_after_case_end_toNat_eq
       = some r') :
     r'.end_ = ((r.end_ : Int) - len).toNat ∧ (0 : Int) ≤ (r.start : Int) - len := by
   classical
-  -- Reduce outer guard to the "after" branch
-  simp [shiftRegionsAfter, hall] at hopt
-  -- Re-express newStart/newEnd the way we want to read them
+  simp [hall] at hopt
   set newStart : Int := (r.start : Int) - len
   set newEnd   : Int := (r.end_  : Int) - len
   have hform : (if h_ok : newStart ≥ 0 ∧ newEnd > newStart then
                   some { start := newStart.toNat, end_ := newEnd.toNat,
                          h_valid := by
-                           -- Reconstruct the inner h_valid proof so types match exactly
                            have : (newStart.toNat : Int) < (newEnd.toNat : Int) := by
                              have h₁ : (newStart.toNat : Int) = newStart := by
                                simp [Int.toNat_of_nonneg h_ok.1]
@@ -1874,18 +1730,14 @@ lemma shiftRegionsAfter_after_case_end_toNat_eq
                              simpa [h₁, h₂] using h_ok.2
                            exact_mod_cast this }
                 else none) = some r' := by
-    -- Align (+ -len) with (- len) via sub_eq_add_neg
     simpa [newStart, newEnd, sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using hopt
-  -- The inner guard must be true, otherwise LHS is none
   by_cases hok : newStart ≥ 0 ∧ newEnd > newStart
   · have hsome := hform
     simp [hok] at hsome
-    -- Extract the record equality and project end_
     have hrec := hsome
     have hend := congrArg GenomicRegion.end_ hrec
     exact ⟨by simpa [newEnd] using hend.symm, hok.1⟩
-  · -- Impossible: none = some r'
-    have := hform
+  · have := hform
     simp [hok] at this
 
 lemma shiftRegionsAfter_inside_case_end_toNat_eq
@@ -1898,7 +1750,6 @@ lemma shiftRegionsAfter_inside_case_end_toNat_eq
         let newEnd   : Int := (r.end_  : Int) + (-(len : Int))
         if h_ok : newStart ≥ 0 ∧ newEnd > newStart then
           let h_valid : newStart.toNat < newEnd.toNat := by
-            -- Derive the Nat inequality from h_ok by transporting through toNat.
             have : (newStart.toNat : Int) < (newEnd.toNat : Int) := by
               have h₁ : (newStart.toNat : Int) = newStart := by
                 simp [Int.toNat_of_nonneg h_ok.1]
@@ -1929,48 +1780,34 @@ lemma shiftRegionsAfter_inside_case_end_toNat_eq
     r'.end_ = ((r.end_ : Int) - len).toNat ∧ (0 : Int) ≤ (r.end_ : Int) - len := by
   classical
   set newEnd : Int := (r.end_ : Int) - len
-  -- Equivalence between the guard used here and an algebraically convenient form
   have hiff :
       (newEnd > r.start) ↔ ((r.start : Int) + (len : Int) < (r.end_ : Int)) := by
     constructor
     · intro h
-      -- add len on both sides
       have := add_lt_add_right h (len : Int)
-      -- (r.end_ - len) + len > r.start + len  ==> r.end_ > r.start + len
       simpa [newEnd, sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using this
     · intro h
-      -- subtract len on both sides
       have := add_lt_add_right h (-(len : Int))
-      -- r.start + len - len < r.end_ - len  ==> r.start < r.end_ - len
       simpa [newEnd, sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using this
   by_cases hgt : newEnd > r.start
-  ·
-    -- Build validity proof outside the record to avoid parser issues
-    have h_nonneg : (0 : Int) ≤ newEnd := by
+  · have h_nonneg : (0 : Int) ≤ newEnd := by
       have : (0 : Int) ≤ (r.start : Int) := by exact_mod_cast Nat.zero_le _
       exact le_trans this (le_of_lt hgt)
     have h_valid' : r.start < newEnd.toNat := by
       have : (r.start : Int) < (newEnd.toNat : Int) := by
         simpa [Int.toNat_of_nonneg h_nonneg] using hgt
       exact_mod_cast this
-    -- From the hypothesis, after simplifying guards, we get a plain record equality.
     have hcond : (r.start : Int) + (len : Int) < (r.end_ : Int) := (hiff.mp hgt)
     have hrec :
         ({ r with end_ := newEnd.toNat, h_valid := h_valid' } : GenomicRegion) = r' := by
-      -- Note: simp reduces Option.some equality to a record equality via Option.some.inj
       simpa [shiftRegionsAfter, hnall, hpart, newEnd, hcond, sub_eq_add_neg] using hopt
-    -- Project the end_ field
     have hend := congrArg GenomicRegion.end_ hrec
     exact ⟨by simpa [newEnd] using hend.symm, h_nonneg⟩
-  ·
-    -- In the inner-false branch, the filterMap yields none, contradicting `= some r'`.
-    have hcond_false : ¬ ((r.start : Int) + (len : Int) < (r.end_ : Int)) := by
+  · have hcond_false : ¬ ((r.start : Int) + (len : Int) < (r.end_ : Int)) := by
       intro hcond
-      -- contradict hgt using the equivalence
       exact hgt (hiff.mpr hcond)
     have hfalse : False := by
-      -- With a false guard, the branch produces `none`, so equality to `some r'` is impossible.
-      simp [shiftRegionsAfter, hnall, hpart, newEnd, hcond_false] at hopt
+      simp [hnall, hpart, hcond_false] at hopt
     cases hfalse
 
 /-- Boundedness of exon ends after deletion. -/
@@ -1981,40 +1818,28 @@ lemma shiftRegionsAfter_bounded_after_deletion
     let shifted_exons := shiftRegionsAfter pos (-(len : Int)) gene.exons
     ∀ r' ∈ shifted_exons, r'.end_ ≤ mutated_seq.length := by
   intro mutated_seq shifted_exons r' hr'
-  -- Pull out a preimage region r producing r'
   rcases List.mem_filterMap.1 hr' with ⟨r, hr_mem, hopt⟩
-  -- mutated length
   have hlen : mutated_seq.length = gene.coding_strand.seq.length - len := by
     simp [mutated_seq, length_after_deletion _ _ _ h]
-  -- Original exon boundedness
   have hr_bound := gene.h_exons_bounded r hr_mem
-  -- Split by the same guards as shiftRegionsAfter
   by_cases hall : pos ≤ r.start
-  · -- After case: both start and end shift left by len
-    -- Extract end_ shape and nonneg from the branch
-    have h_after :=
+  · have h_after :=
       shiftRegionsAfter_after_case_end_toNat_eq
         (pos := pos) (len := len) (r := r) (r' := r') hall hopt
     rcases h_after with ⟨hend_eq, hstart_nonneg⟩
-    -- From newStart ≥ 0, get len ≤ r.start ≤ r.end_
     have hlen_le_start : len ≤ r.start :=
       nat_le_of_int_sub_nonneg (a := r.start) (b := len) hstart_nonneg
     have hlen_le_end : len ≤ r.end_ := le_trans hlen_le_start (le_of_lt r.h_valid)
-    -- Convert toNat subtraction into Nat subtraction
     have hendNat : ((r.end_ : Int) - len).toNat = r.end_ - len :=
       Int.toNat_sub_of_le r.end_ len hlen_le_end
-    -- Bound: r'.end_ = r.end_ - len ≤ gene.len - len
     have : r'.end_ ≤ gene.coding_strand.seq.length - len := by
       simpa [hend_eq, hendNat] using Nat.sub_le_sub_right hr_bound len
     simpa [hlen] using this
-  · -- Not after: split into overlap vs before
-    by_cases hpart : pos < r.end_
-    · -- Inside/overlap case: only the end shifts left by len
-      have h_inside :=
+  · by_cases hpart : pos < r.end_
+    · have h_inside :=
         shiftRegionsAfter_inside_case_end_toNat_eq
           (pos := pos) (len := len) (r := r) (r' := r') (hnall := hall) (hpart := hpart) hopt
       rcases h_inside with ⟨hend_eq, hend_nonneg⟩
-      -- From newEnd ≥ 0, deduce len ≤ r.end_
       have hlen_le_end : len ≤ r.end_ :=
         nat_le_of_int_sub_nonneg (a := r.end_) (b := len) hend_nonneg
       have hendNat : ((r.end_ : Int) - len).toNat = r.end_ - len :=
@@ -2022,15 +1847,10 @@ lemma shiftRegionsAfter_bounded_after_deletion
       have : r'.end_ ≤ gene.coding_strand.seq.length - len := by
         simpa [hend_eq, hendNat] using Nat.sub_le_sub_right hr_bound len
       simpa [hlen] using this
-    · -- Before case: unchanged region, and r.end_ ≤ pos ≤ gene.len - len
-      have r_before : r.end_ ≤ pos := le_of_not_gt hpart
-      -- In this branch the filterMap returns `some r`, hence r' = r
+    · have r_before : r.end_ ≤ pos := le_of_not_gt hpart
       have hr'_eq_r : r' = r := by
-        -- In the before-branch of `shiftRegionsAfter`, the region is unchanged
-        simp [shiftRegionsAfter, hall, hpart] at hopt
-        -- hopt simplifies to r = r', so take symmetry
+        simp [hall, hpart] at hopt
         exact hopt.symm
-      -- Bound r.end_ by gene.len - len via pos + len ≤ gene.len
       have hpos_le : pos ≤ gene.coding_strand.seq.length - len :=
         le_sub_of_add_le (a := pos) (b := len) (c := gene.coding_strand.seq.length) h
       have : r'.end_ ≤ gene.coding_strand.seq.length - len := by
@@ -2044,7 +1864,7 @@ private def enforceSortedNonOverlap.go (lastEnd : Nat) : List GenomicRegion → 
   | r :: rs =>
     let start' := max r.start lastEnd
     if h : start' < r.end_ then
-      let r' : GenomicRegion := { r with start := start', h_valid := h } -- use the branch witness directly
+      let r' : GenomicRegion := { r with start := start', h_valid := h }
       r' :: enforceSortedNonOverlap.go r'.end_ rs
     else
       enforceSortedNonOverlap.go lastEnd rs
@@ -2064,35 +1884,26 @@ private lemma enforceSortedNonOverlap.head_start_ge
   | cons r rs ih =>
       intro lastEnd s rest h
       dsimp [enforceSortedNonOverlap.go] at h
-      -- Keep start' abstract to avoid rewriting guards to conjunctions.
       set start' := max r.start lastEnd with hstart'
       by_cases hk : start' < r.end_
-      · -- kept r (clamped)
-        -- Rewrite equality under kept branch
-        have hcons :
+      · have hcons :
             ({ r with start := start', h_valid := hk } : GenomicRegion) ::
               enforceSortedNonOverlap.go r.end_ rs = s :: rest := by
-          -- Do not include hstart' in simp args to avoid max_lt_iff rewriting.
           simpa [enforceSortedNonOverlap.go, hk] using h
-        -- Extract head equality via head?
         have hhead :
             some ({ r with start := start', h_valid := hk } : GenomicRegion) = some s := by
           simpa using congrArg List.head? hcons
         have hs_eq : ({ r with start := start', h_valid := hk } : GenomicRegion) = s :=
           Option.some.inj hhead
-        -- Conclude lastEnd ≤ s.start from start' = max r.start lastEnd
         have hle : lastEnd ≤ start' := Nat.le_max_right _ _
-        -- Rewrite s.start using hs_eq
-        aesop--simpa [hs_eq] using hle
-      · -- dropped r, continue with IH on the rewritten equality
-        have h' : enforceSortedNonOverlap.go lastEnd rs = s :: rest := by
+        aesop
+      · have h' : enforceSortedNonOverlap.go lastEnd rs = s :: rest := by
           simpa [enforceSortedNonOverlap.go, hk] using h
         exact ih h'
 
 /-- The normalizer produces a Chain'-sorted list. -/
 lemma enforceSortedNonOverlap_chain (regions : List GenomicRegion) :
     List.Chain' (fun r1 r2 => r1.end_ ≤ r2.start) (enforceSortedNonOverlap regions) := by
-  -- Prove a stronger statement for the forward-building worker `go`.
   have aux :
       ∀ (rs : List GenomicRegion), ∀ lastEnd,
         List.Chain' (fun r1 r2 => r1.end_ ≤ r2.start)
@@ -2101,36 +1912,27 @@ lemma enforceSortedNonOverlap_chain (regions : List GenomicRegion) :
     induction rs with
     | nil =>
         intro lastEnd
-        simp [enforceSortedNonOverlap, enforceSortedNonOverlap.go]
+        simp [enforceSortedNonOverlap.go]
     | cons r rs ih =>
         intro lastEnd
         dsimp [enforceSortedNonOverlap.go]
-        -- Keep start' abstract to avoid conj guards
         set start' := max r.start lastEnd with hstart'
         by_cases hk : start' < r.end_
-        · -- keep clamped region, show chain for r' :: tail
-          -- Build the tail once
-          cases htail : enforceSortedNonOverlap.go (r.end_) rs with
+        · cases htail : enforceSortedNonOverlap.go (r.end_) rs with
           | nil =>
-              -- Single element list is trivially Chain'
-              simp [enforceSortedNonOverlap.go, hk, htail]
+              simp [hk]
           | cons s rest =>
-              -- Need r'.end_ ≤ s.start and Chain for s :: rest
               have hs : r.end_ ≤ s.start :=
                 enforceSortedNonOverlap.head_start_ge (lastEnd := r.end_) (rs := rs) (s := s) (rest := rest) htail
-              -- r'.end_ = r.end_ since updating start only
               have hs' :
                   ({ r with start := start', h_valid := hk } : GenomicRegion).end_ ≤ s.start := by
                 simpa using hs
-              -- Chain' for tail by IH on rs with lastEnd = r.end_
               have hchain_tail :
                   List.Chain' (fun r1 r2 => r1.end_ ≤ r2.start) (s :: rest) := by
                 simpa [htail] using ih (r.end_)
-              -- Unfold Chain' on the cons
               simpa [enforceSortedNonOverlap.go, hk, htail] using
                 And.intro hs' hchain_tail
-        · -- drop r, use IH
-          simpa [enforceSortedNonOverlap.go, hk] using ih lastEnd
+        · simpa [enforceSortedNonOverlap.go, hk] using ih lastEnd
   simpa [enforceSortedNonOverlap] using aux regions 0
 
 /-- Boundedness propagates through the normalizer. -/
@@ -2138,7 +1940,6 @@ lemma enforceSortedNonOverlap_bounded
     {L : Nat} {regions : List GenomicRegion}
     (hB : ∀ r ∈ regions, r.end_ ≤ L) :
     ∀ r' ∈ enforceSortedNonOverlap regions, r'.end_ ≤ L := by
-  -- Prove a stronger statement directly for the forward-building worker `go`.
   have aux :
       ∀ (rs : List GenomicRegion) (lastEnd : Nat),
         (∀ r ∈ rs, r.end_ ≤ L) →
@@ -2147,25 +1948,20 @@ lemma enforceSortedNonOverlap_bounded
     induction rs with
     | nil =>
         intro lastEnd _ r' hr'
-        -- go lastEnd [] = []
         simp [enforceSortedNonOverlap.go] at hr'
     | cons r rs ih =>
         intro lastEnd hRs r' hr'
         dsimp [enforceSortedNonOverlap.go] at hr'
         set start' := max r.start lastEnd with hstart'
         by_cases hk : start' < r.end_
-        · -- kept head, membership splits
-          have hRs_head : r.end_ ≤ L := hRs r (by simp)
+        · have hRs_head : r.end_ ≤ L := hRs r (by simp)
           have hRs_tail : ∀ x ∈ rs, x.end_ ≤ L := by
             intro x hx; exact hRs x (by simp [hx])
-          -- Under kept branch, rewrite membership into the concrete cons
           have hmem :
               r' ∈ ({ r with start := start', h_valid := hk } : GenomicRegion) ::
                     enforceSortedNonOverlap.go
                       (({ r with start := start', h_valid := hk } : GenomicRegion).end_) rs := by
-            -- Avoid rewriting start' into max ... to prevent conj guards; do not use hstart' here.
             simpa [enforceSortedNonOverlap.go, hk] using hr'
-          -- Split membership
           have hr'cases :
               r' = ({ r with start := start', h_valid := hk } : GenomicRegion) ∨
               r' ∈ enforceSortedNonOverlap.go
@@ -2173,30 +1969,22 @@ lemma enforceSortedNonOverlap_bounded
             (List.mem_cons).1 hmem
           cases hr'cases with
           | inl hhead =>
-              -- r' is the clamped head; end_ unchanged
               have : r'.end_ ≤ L := by
-                -- r'.end_ = r.end_
                 simpa [hhead] using hRs_head
               exact this
           | inr htail =>
-              -- r' in tail; first replace r'.end_ with r.end_ in the go-argument
               have rend :
                   ({ r with start := start', h_valid := hk } : GenomicRegion).end_ = r.end_ := rfl
               have htail' :
                   r' ∈ enforceSortedNonOverlap.go (r.end_) rs := by
                 simpa [rend] using htail
-              -- recurse with lastEnd = r.end_
               exact ih (r.end_) hRs_tail r' htail'
-        · -- dropped head; recurse on tail with same lastEnd
-          have hRs_tail : ∀ x ∈ rs, x.end_ ≤ L := by
+        · have hRs_tail : ∀ x ∈ rs, x.end_ ≤ L := by
             intro x hx; exact hRs x (by simp [hx])
-          -- Rewrite membership to the tail, then apply IH
           have hr'_tail : r' ∈ enforceSortedNonOverlap.go lastEnd rs := by
-            -- Avoid including hstart' to prevent conj guards; hk is enough.
             simpa [enforceSortedNonOverlap.go, hk] using hr'
           exact ih lastEnd hRs_tail r' hr'_tail
   intro r' hr'
-  -- Apply aux with lastEnd = 0 and rs = regions
   have := aux regions 0 hB r' (by simpa [enforceSortedNonOverlap] using hr')
   exact this
 
@@ -2225,7 +2013,6 @@ lemma length_after_inversion {α} (l : List α) (start end_ : Nat)
     _ = l.length := by
           have h1 : start + (end_ - start) = end_ := Nat.add_sub_of_le hse
           have h2 : end_ + (l.length - end_) = l.length := Nat.add_sub_of_le hend
-          -- rewrite with h1, then finish with h2
           calc
             start + (end_ - start) + (l.length - end_)
                 = (start + (end_ - start)) + (l.length - end_) := by
@@ -2234,7 +2021,7 @@ lemma length_after_inversion {α} (l : List α) (start end_ : Nat)
             _ = l.length := h2
 
 /--
-NEW: A robust, single-pass function to apply a deletion to an exon list.
+A robust, single-pass function to apply a deletion to an exon list.
 This function correctly merges exons when an intron is deleted, and truncates
 exons when the deletion overlaps them. It replaces the fragile `shiftRegionsAfter`
 and `enforceSortedNonOverlap` combination for deletions.
@@ -2246,28 +2033,19 @@ def applyDeletionToExons (exons : List GenomicRegion) (del_start del_end : Nat) 
     | r :: rs =>
       let r_start := r.start
       let r_end := r.end_
-      -- Case 1: Exon is completely before the deletion. Keep it.
       if h_before : r_end ≤ del_start then
         go rs (r :: acc)
-      -- Case 2: Exon is completely after the deletion. Shift it left.
       else if h_after : r_start ≥ del_end then
         let shift_len := del_end - del_start
-        -- Prove start - shift_len < end_ - shift_len using r.h_valid
-        -- and shift_len ≤ r.start, shift_len ≤ r.end_.
         have h_s_le_start : shift_len ≤ r.start := by
-          -- shift_len ≤ del_end ≤ r.start
           exact le_trans (Nat.sub_le _ _) h_after
         have h_delEnd_le_end : del_end ≤ r.end_ := by
-          -- del_end ≤ r_start ≤ r_end_
           exact le_trans h_after (Nat.le_of_lt r.h_valid)
         have h_s_le_end : shift_len ≤ r.end_ := by
           exact le_trans (Nat.sub_le _ _) h_delEnd_le_end
-        -- Convert r.start < r.end_ to (shift_len + (r.start - shift_len)) < (shift_len + (r.end_ - shift_len))
         have h_added :
             shift_len + (r.start - shift_len) < shift_len + (r.end_ - shift_len) := by
-          -- Use add-sub, which matches the goal shape directly without needing commutativity.
           simpa [Nat.add_sub_of_le h_s_le_start, Nat.add_sub_of_le h_s_le_end] using r.h_valid
-        -- Cancel the common addend on the left
         have h_sub_lt :
             r.start - shift_len < r.end_ - shift_len := Nat.lt_of_add_lt_add_left h_added
         let new_r : GenomicRegion := {
@@ -2276,17 +2054,13 @@ def applyDeletionToExons (exons : List GenomicRegion) (del_start del_end : Nat) 
           h_valid := h_sub_lt
         }
         go rs (new_r :: acc)
-      -- Case 3: Deletion is strictly within the exon. Shrink its end.
       else if h_inside : del_start > r_start ∧ del_end < r_end then
         let shift_len := del_end - del_start
-        -- Show r.start < r.end_ - shift_len by showing r.start + shift_len < r.end_,
-        -- then use Nat.lt_sub_iff_add_lt (since shift_len ≤ r.end_).
         have h_s_le_end : shift_len ≤ r.end_ := by
           exact le_trans (Nat.sub_le _ _) (Nat.le_of_lt h_inside.2)
         have h_add_lt : r.start + shift_len < r.end_ := by
           by_cases h_order : del_start ≤ del_end
-          · -- r.start + (del_end - del_start) < del_end < r.end_
-            have h_lt_left :
+          · have h_lt_left :
                 r.start + (del_end - del_start) < del_start + (del_end - del_start) :=
               Nat.add_lt_add_right (show r.start < del_start from h_inside.1) _
             have h_eq : del_start + (del_end - del_start) = del_end :=
@@ -2294,8 +2068,7 @@ def applyDeletionToExons (exons : List GenomicRegion) (del_start del_end : Nat) 
             have h_left' : r.start + shift_len < del_end := by
               simpa [h_eq] using h_lt_left
             exact lt_trans h_left' h_inside.2
-          · -- del_end < del_start ⇒ shift_len = 0
-            have hlt : del_end < del_start := Nat.lt_of_not_ge h_order
+          · have hlt : del_end < del_start := Nat.lt_of_not_ge h_order
             have h_zero : shift_len = 0 := Nat.sub_eq_zero_of_le (le_of_lt hlt)
             simpa [h_zero] using r.h_valid
         have h_valid' : r.start < r.end_ - shift_len :=
@@ -2306,15 +2079,13 @@ def applyDeletionToExons (exons : List GenomicRegion) (del_start del_end : Nat) 
           h_valid := h_valid'
         }
         go rs (new_r :: acc)
-      -- Case 4: Complex overlaps (truncation, merging)
       else
-        -- Simplify by truncating from the right.
         let new_end := if r_end ≤ del_end then del_start else r_end - (del_end - del_start)
         if h_keep : r_start < new_end then
           let new_r : GenomicRegion := { r with end_ := new_end, h_valid := h_keep }
           go rs (new_r :: acc)
         else
-          go rs acc -- Deletion consumed the whole exon
+          go rs acc
   go exons []
 
 /-- Apply deletion mutation with coordinate adjustment (uses proven normalizer). -/
@@ -2357,7 +2128,6 @@ def applyDeletion (gene : Gene) (pos : Nat) (len : Nat) : Option Gene :=
     else none
   else none
 
--- Replace the sorrys in applyDeletion by using the new API
 /-
 /-- Apply deletion mutation with coordinate adjustment -/
 def applyDeletion (gene : Gene) (pos : Nat) (len : Nat) : Option Gene :=
@@ -2379,24 +2149,18 @@ def applyDeletion (gene : Gene) (pos : Nat) (len : Nat) : Option Gene :=
           if p ≥ pos + len then some (p - len)
           else if p ≥ pos then none
           else some p)
-        -- Sorted by construction
         h_exons_sorted := by
           simpa using enforceSortedNonOverlap_chain shifted_exons_raw
-        -- Boundedness from deletion-boundedness lemma + normalizer preserves end_
         h_exons_bounded := by
           intro r' hr'
-          -- First, all raw-shifted exons are bounded
           have hB_raw :
               ∀ x ∈ shifted_exons_raw, x.end_ ≤ mutated_seq.length := by
             intro x hx
-            -- use the deletion boundedness API
             simpa [mutated_seq] using
               shiftRegionsAfter_bounded_after_deletion
                 (gene := gene) (pos := pos) (len := len) h_bounds
                 x hx
-          -- Then, the normalizer preserves boundedness
           have : ∀ x ∈ shifted_exons, x.end_ ≤ mutated_seq.length := by
-            -- shifted_exons is normalization of raw; reuse boundedness through normalizer
             simpa [shifted_exons] using
               enforceSortedNonOverlap_bounded
                 (regions := shifted_exons_raw) (L := mutated_seq.length) hB_raw
@@ -2440,12 +2204,9 @@ def applyInversion (gene : Gene) (start end_ : Nat) : Option Gene :=
       h_exons_bounded := by
         intro r hr
         have hb := gene.h_exons_bounded r hr
-        -- mutated length = original length
         have hlen :
             mutated_seq.length = gene.coding_strand.seq.length := by
-          -- start ≤ end_ and end_ ≤ len
           have hse : start ≤ end_ := Nat.le_of_lt h_bounds.1
-          -- Unfold seg/segLen so the lemma matches the goal exactly
           simpa [mutated_seq, seg, segLen] using
             (length_after_inversion gene.coding_strand.seq start end_ hse h_bounds.2)
         simpa [hlen]
@@ -2504,11 +2265,11 @@ Apply a splice-site mutation at the actual splice windows checked by `splice`:
   (i.e., not the first exon) and no underflow.
 -/
 def applySpliceSite (gene : Gene) (exonIdx : Nat) (isDonor : Bool) (newBase : DNABase) : Option Gene :=
-  if hidx : exonIdx < gene.exons.length then
+  if exonIdx < gene.exons.length then
     let r := gene.exons[exonIdx]!
     if isDonor then
-      if hnext : exonIdx + 1 < gene.exons.length then
-        if hpos : r.end_ < gene.coding_strand.seq.length then
+      if exonIdx + 1 < gene.exons.length then
+        if r.end_ < gene.coding_strand.seq.length then
           -- Mutate first base of donor window at r.end_
           let orig := gene.coding_strand.seq.getD r.end_ DNABase.N
           applySubstitution gene r.end_ orig newBase
@@ -2516,9 +2277,9 @@ def applySpliceSite (gene : Gene) (exonIdx : Nat) (isDonor : Bool) (newBase : DN
       else none
     else
       let L_acc := gene.splice_sites.acceptorSite.length
-      if hprev : 0 < exonIdx ∧ L_acc ≤ r.start then
+      if 0 < exonIdx ∧ L_acc ≤ r.start then
         let pos := r.start - L_acc
-        if hpos : pos < gene.coding_strand.seq.length then
+        if pos < gene.coding_strand.seq.length then
           -- Mutate first base of acceptor window at r.start - L_acc
           let orig := gene.coding_strand.seq.getD pos DNABase.N
           applySubstitution gene pos orig newBase
@@ -2526,9 +2287,6 @@ def applySpliceSite (gene : Gene) (exonIdx : Nat) (isDonor : Bool) (newBase : DN
       else none
   else none
 
-/--
-REVISED: The main dispatcher now points to the refactored functions.
--/
 def applyMutation (gene : Gene) (m : Mutation) : Option Gene :=
   match m with
   | .Substitution pos orig new => applySubstitution gene pos orig new
@@ -2559,11 +2317,11 @@ def analyzeMutationEffect'' (gene : Gene) (m : Mutation) : MutationEffect :=
 Comprehensive mutation effect analysis, using arithmetic for frameshift detection.
 -/
 def analyzeMutationEffect' (gene : Gene) (m : Mutation) : MutationEffect :=
-  -- First, check for frameshift based on arithmetic properties. This is the most reliable check.
+  -- First, we check for frameshift based on arithmetic properties. This is the most reliable check.
   if mutationIsFrameshift gene m then
     .Frameshift
   else
-    -- For other cases, simulate the effect by comparing protein products.
+    -- For other cases, we simulate the effect by comparing protein products.
     match applyMutation gene m with
     | none => .InvalidMutation
     | some mutated_gene =>
@@ -2614,7 +2372,6 @@ def analyzeMutationEffect (gene : Gene) (m : Mutation) : MutationEffect :=
         if o = m_prot then .Silent
         else if o.length = m_prot.length then .Missense
         else if m_prot.isPrefixOf o then .Nonsense
-        -- REVISED: More precise classification for in-frame indels
         else
           match m with
           | .Insertion .. => .InFrameIndel
@@ -2623,7 +2380,9 @@ def analyzeMutationEffect (gene : Gene) (m : Mutation) : MutationEffect :=
       | some _, none => .NoProtein
       | none, some _ => .RegulatoryDefect
       | none, none => .Silent
--- Section 6: Core Theorems with Complete Proofs
+
+/- ### Section 6: Core Theorems with Complete Proofs -/
+
 namespace Bio.Theorems
 
 open Bio Bio.Sequence Bio.Genetics Bio.Mutation
@@ -2690,9 +2449,9 @@ lemma exon_slice_unchanged_under_intronic_subst
   ext i
   by_cases h_i : i < region.length
   · have h_ne := exon_slice_pos_ne_intronic_pos gene pos h_intr h_region i h_i
-    simp [List.getElem?_drop, List.getElem?_take, h_i,
+    simp [List.getElem?_drop, h_i,
           transcribe_set_ne _ _ _ _ h_ne]
-  · simp [List.getElem?_drop, List.getElem?_take, h_i]
+  · simp [h_i]
 
 namespace Bio.Genetics
 
@@ -2710,7 +2469,7 @@ private lemma spliceAndCheck_congr_slices
   induction exons with
   | nil =>
       intro acc hSlices
-      simp [splice, spliceAndCheck]
+      simp [spliceAndCheck]
   | cons r rs ih =>
       intro acc hSlices
       have h_head :
@@ -2723,7 +2482,6 @@ private lemma spliceAndCheck_congr_slices
             (pre₂.drop r'.start |>.take r'.length) := by
         intro r' hr'
         exact hSlices r' (by simp [hr'])
-      -- Split on the shared guard and simplify both sides.
       by_cases hc :
         ((acc.isEmpty ||
           decide (((g.coding_strand.seq.drop (r.start - g.splice_sites.acceptorSite.length)).take
@@ -2732,12 +2490,9 @@ private lemma spliceAndCheck_congr_slices
          (rs.isEmpty ||
           decide (((g.coding_strand.seq.drop r.end_).take g.splice_sites.donorSite.length)
                     = g.splice_sites.donorSite)))
-      ·
-        simp [splice, spliceAndCheck, h_head, hc]
-        -- Apply IH on the tail with the specialized slice hypothesis.
+      · simp [spliceAndCheck, h_head]
         aesop
-      ·
-        simp [splice, spliceAndCheck, h_head, hc]
+      · simp [spliceAndCheck, h_head]
         aesop
 
 /-- A conservative “safety” predicate: the genomic position `pos` is intronic
@@ -2757,17 +2512,14 @@ lemma take_drop_set_outside {α} (l : List α) (pos start len : Nat) (a : α)
     (hout : ∀ i, i < len → start + i ≠ pos) :
     ((l.set pos a).drop start).take len = (l.drop start).take len := by
   classical
-  -- pointwise on getElem?
   ext i
   by_cases hi : i < len
   · have hne : start + i ≠ pos := hout i hi
-    -- use getElem?_set_ne at the absolute index `start + i`
     have hraw :
         (l.set pos a)[start + i]? = l[start + i]? := by
       simpa using List.getElem?_set_ne (l := l) (i := pos) (j := start + i) (a := a) (h := hne.symm)
-    -- now reduce drop/take to absolute index
-    simp [List.getElem?_drop, List.getElem?_take, hi, hraw]
-  · simp [List.getElem?_take, hi]
+    simp [List.getElem?_drop, hi, hraw]
+  · simp [hi]
 
 /-! Helpers for the acceptor window avoidance proof -/
 
@@ -2802,13 +2554,10 @@ private lemma acceptor_avoid_pos_underflow_i_in_exon_contra
     {L i : Nat} (hzero : r.start - L = 0) (hi_ge_start : r.start ≤ i) (hi_lt_end : i < r.end_) :
     (r.start - L) + i ≠ pos := by
   intro hip
-  -- From underflow and equality we get i = pos
   have hi_pos : i = pos := by simpa [hzero] using hip
-  -- Then pos lies in r by the bounds on i
   have : pos ≥ r.start ∧ pos < r.end_ := by
     exact ⟨by simpa [hi_pos] using hi_ge_start,
            by simpa [hi_pos] using hi_lt_end⟩
-  -- Intronic excludes being inside any exon
   exact (not_in_exon_of_intronic gene pos hintr hr) this
 
 private lemma acceptor_avoid_pos_underflow_ge_end_pos_lt_end
@@ -2816,7 +2565,6 @@ private lemma acceptor_avoid_pos_underflow_ge_end_pos_lt_end
     {L i : Nat} (hzero : r.start - L = 0) (hi_ge_end : r.end_ ≤ i) (hpos_lt_end : pos < r.end_) :
     (r.start - L) + i ≠ pos := by
   intro hip
-  -- Convert the absolute equality to i = pos, then rewrite the bound
   have hi_pos : i = pos := by simpa [hzero] using hip
   have hpos_ge_end : r.end_ ≤ pos := by simpa [hi_pos] using hi_ge_end
   exact (not_le_of_gt hpos_lt_end) hpos_ge_end
@@ -2830,17 +2578,15 @@ private lemma acceptor_avoid_pos_underflow_ge_end_pos_ge
     (hpos_ge : r.end_ + gene.splice_sites.donorSite.length ≤ pos) :
     (r.start - L) + i ≠ pos := by
   intro hip
-  -- Reduce to i ≠ pos via underflow equality
   have hi_pos : i = pos := by simpa [hzero] using hip
   have : i < pos := lt_of_lt_of_le hi_lt_right hpos_ge
-  -- Conclude inequality and lift back through underflow normalization
   have hne : i ≠ pos := ne_of_lt this
   subst hi_pos
   simp_all only [zero_add, lt_self_iff_false]
 
 /-- Indices of the acceptor window avoid a “safe” intronic position.
 
-REVISED: requires a mild separation bound `Lacc ≤ r.end_ + Ldon` to rule out the
+requires a mild separation bound `Lacc ≤ r.end_ + Ldon` to rule out the
 previously unprovable corner case when `r.start - Lacc = 0`, `i ≥ r.end_`, and `pos ≥ r.end_ + Ldon`. -/
 lemma acceptor_window_avoid_pos
     (gene : Gene) (pos : Nat)
@@ -2854,39 +2600,27 @@ lemma acceptor_window_avoid_pos
   rcases hsafe with ⟨hintr, hwin⟩
   have hpos := (hwin r hr).1
   rcases hpos with hlt | hge
-  ·
-    exact acceptor_avoid_pos_before_start (gene := gene) (pos := pos) (r := r) (hr := hr)
+  · exact acceptor_avoid_pos_before_start (gene := gene) (pos := pos) (r := r) (hr := hr)
       (hi := hi) (hlt := hlt)
-  ·
-    by_cases hL : L ≤ r.start
-    ·
-      exact acceptor_avoid_pos_L_le_start (gene := gene) (pos := pos) (r := r) (hr := hr)
+  · by_cases hL : L ≤ r.start
+    · exact acceptor_avoid_pos_L_le_start (gene := gene) (pos := pos) (r := r) (hr := hr)
         (hi := hi) (hge := hge) (hL := hL)
-    ·
-      have hzero : r.start - L = 0 := by
+    · have hzero : r.start - L = 0 := by
         have hle : r.start ≤ L := le_of_lt (lt_of_not_ge hL)
         simpa using Nat.sub_eq_zero_of_le hle
       by_cases hi_lt_start : i < r.start
-      ·
-        exact acceptor_avoid_pos_underflow_lt_start (gene := gene) (pos := pos) (r := r) (hr := hr)
+      · exact acceptor_avoid_pos_underflow_lt_start (gene := gene) (pos := pos) (r := r) (hr := hr)
           (hi := hi) (hge := hge) (hzero := hzero) (hi_lt_start := hi_lt_start)
-      ·
-        have hi_ge_start : r.start ≤ i := le_of_not_gt hi_lt_start
+      · have hi_ge_start : r.start ≤ i := le_of_not_gt hi_lt_start
         have hdon := (hwin r hr).2
         by_cases hi_lt_end : i < r.end_
-        ·
-          exact acceptor_avoid_pos_underflow_i_in_exon_contra (gene := gene) (pos := pos) (r := r) (hr := hr)
+        · exact acceptor_avoid_pos_underflow_i_in_exon_contra (gene := gene) (pos := pos) (r := r) (hr := hr)
             (hintr := hintr) (hzero := hzero) (hi_ge_start := hi_ge_start) (hi_lt_end := hi_lt_end)
-        ·
-          have hi_ge_end : r.end_ ≤ i := le_of_not_gt hi_lt_end
+        · have hi_ge_end : r.end_ ≤ i := le_of_not_gt hi_lt_end
           rcases hdon with hpos_lt_end | hpos_ge
-          ·
-            exact acceptor_avoid_pos_underflow_ge_end_pos_lt_end (gene := gene) (pos := pos) (r := r) (hr := hr)
+          · exact acceptor_avoid_pos_underflow_ge_end_pos_lt_end (gene := gene) (pos := pos) (r := r) (hr := hr)
               (hzero := hzero) (hi_ge_end := hi_ge_end) (hpos_lt_end := hpos_lt_end)
-          ·
-            -- Final subcase: i ≥ r.end_ and pos ≥ r.end_ + Ldon.
-            -- Use the separation bound to derive i < r.end_ + Ldon from i < L.
-            have hi_lt_right : i < r.end_ + gene.splice_sites.donorSite.length :=
+          · have hi_lt_right : i < r.end_ + gene.splice_sites.donorSite.length :=
               lt_of_lt_of_le hi hLsep
             exact acceptor_avoid_pos_underflow_ge_end_pos_ge (gene := gene) (pos := pos) (r := r) (hr := hr)
               (hzero := hzero) (hi_ge_start := hi_ge_start) (hi_ge_end := hi_ge_end)
@@ -2903,15 +2637,12 @@ lemma acceptor_window_unchanged
       = take L (drop (r.start - L) (gene.coding_strand.seq)) := by
   classical
   intro L
-  -- Obtain the avoidance property with the separation hypothesis
   have hout :=
     acceptor_window_avoid_pos
       (gene := gene) (pos := pos) (r := r) (hr := hr)
       (hsafe := hsafe) (hLsep := hLsep)
-  -- Align both “let L := …” binders
   have hout' : ∀ i, i < L → (r.start - L) + i ≠ pos := by
     simpa [L] using hout
-  -- Apply generic slice stability
   simpa using
     take_drop_set_outside
       (l := gene.coding_strand.seq) (pos := pos)
@@ -2931,17 +2662,13 @@ lemma donor_window_unchanged
   intro L
   rcases hsafe with ⟨_, hwin⟩
   have hpos := (hwin r hr).2
-  -- Any index r.end_ + i for i < L differs from pos by donor-window safety
   have hout : ∀ i, i < L → r.end_ + i ≠ pos := by
     intro i hi
     rcases hpos with hlt | hge
-    · -- pos < r.end_ ≤ r.end_ + i ⇒ pos < r.end_ + i
-      have : pos < r.end_ + i := lt_of_lt_of_le hlt (Nat.le_add_right _ _)
+    · have : pos < r.end_ + i := lt_of_lt_of_le hlt (Nat.le_add_right _ _)
       exact (ne_of_lt this).symm
-    · -- r.end_ + i < r.end_ + L ≤ pos ⇒ r.end_ + i < pos
-      have : r.end_ + i < r.end_ + L := Nat.add_lt_add_left hi _
+    · have : r.end_ + i < r.end_ + L := Nat.add_lt_add_left hi _
       exact ne_of_lt (lt_of_lt_of_le this hge)
-  -- Apply generic slice stability
   simpa using
     take_drop_set_outside (l := gene.coding_strand.seq) (pos := pos)
       (start := r.end_) (len := L) (a := new_base) hout
@@ -2972,14 +2699,12 @@ lemma splice_sites_unchanged_under_intronic_subst
       spliceAndCheck
         ({ gene with
             coding_strand := { seq := gene.coding_strand.seq.set pos new_base }
-            -- preserve boundedness since List.set preserves length
             , h_exons_bounded := by
                 intro r hr
                 simpa [List.length_set] using (gene.h_exons_bounded r hr) })
         pre exons acc =
       spliceAndCheck gene pre exons acc := by
   intro pre exons acc h_subset
-  -- Use a local name for the mutated gene to make rewriting clearer.
   let mutated_gene : Gene :=
     { gene with
         coding_strand := { seq := gene.coding_strand.seq.set pos new_base }
@@ -3007,8 +2732,7 @@ lemma splice_sites_unchanged_under_intronic_subst
       (rs = [] ∨
         take Ldon (drop r.end_ gene.coding_strand.seq) = gene.splice_sites.donorSite)
     by_cases hc : cond
-    ·
-      -- When the condition holds, both sides take the "ok" branch with identical guards,
+    · -- When the condition holds, both sides take the "ok" branch with identical guards,
       -- because the splice windows are unchanged under the safe intronic substitution.
       simp [spliceAndCheck, cond, hc,
             (acceptor_window_unchanged (gene := gene) (pos := pos) (new_base := new_base)
@@ -3017,8 +2741,7 @@ lemma splice_sites_unchanged_under_intronic_subst
               (r := r) (hr := hr_in) (hsafe := h_safe))]
       -- Tail call with extended accumulator; restrict subset hypothesis to the tail.
       aesop
-    ·
-      -- When the condition fails, both sides take the "fail" path in the same way.
+    · -- When the condition fails, both sides take the "fail" path in the same way.
       simp [spliceAndCheck, cond, hc,
             (acceptor_window_unchanged (gene := gene) (pos := pos) (new_base := new_base)
               (r := r) (hr := hr_in) (hsafe := h_safe) (hLsep := h_sep_r)),
@@ -3041,7 +2764,6 @@ lemma splice_independent_of_intronic_pos
               simpa [List.length_set] using (gene.h_exons_bounded r hr) }
     splice mutated_gene = splice gene := by
   classical
-  -- Name the mutated gene with the dependent proof adjusted for length.
   let mutated_gene : Gene :=
     { gene with
         coding_strand := { seq := gene.coding_strand.seq.set pos new_base }
@@ -3050,24 +2772,21 @@ lemma splice_independent_of_intronic_pos
             simpa [List.length_set] using (gene.h_exons_bounded r hr) }
   let pre  := transcribe gene.coding_strand.seq
   let post := transcribe mutated_gene.coding_strand.seq
-  -- Per-exon slices on pre/post are equal under a safe intronic substitution.
   have hSlices :
       ∀ region ∈ gene.exons,
         (post.drop region.start |>.take region.length) =
         (pre.drop  region.start |>.take region.length) :=
     exon_slices_unchanged_under_intronic_subst gene pos new_base h_intronic h_safe
-  -- Splice-site checks (guards) are unchanged on the original pre-mRNA.
   have hSites :
       ∀ exons acc, (∀ r ∈ exons, r ∈ gene.exons) →
         spliceAndCheck mutated_gene pre exons acc =
         spliceAndCheck gene         pre exons acc :=
     by
-      -- Reuse the previous lemma with the same mutated gene.
       simpa using
         splice_sites_unchanged_under_intronic_subst
           gene pos new_base h_intronic h_safe h_sep
-  -- Now switch the left splice from `post` to `pre` using slice congruence,
-  -- then use hSites to switch mutated→original on the same `pre`.
+  -- Now we switch the left splice from `post` to `pre` using slice congruence,
+  -- then we use hSites to switch mutated→original on the same `pre`.
   unfold splice
   -- Step 1: mutated_gene: post → pre
   have h_congr :
@@ -3080,8 +2799,6 @@ lemma splice_independent_of_intronic_pos
       spliceAndCheck mutated_gene pre gene.exons [] =
       spliceAndCheck gene         pre gene.exons [] :=
     hSites _ _ (by intro r hr; exact hr)
-  -- Put the pieces together.
-  simp [pre, post, h_congr, h_sites0]
   aesop
 
 theorem intronic_substitution_preserves_protein (gene : Gene) (pos : Nat)
@@ -3091,18 +2808,16 @@ theorem intronic_substitution_preserves_protein (gene : Gene) (pos : Nat)
     ∀ mutated_gene, applySubstitution gene pos original new = some mutated_gene →
     synthesizeProtein gene = synthesizeProtein mutated_gene := by
   intro mutated_gene h_apply
-  -- Only unfold applySubstitution for the equality; keep synthesizeProtein abstract.
   unfold applySubstitution at h_apply
   by_cases h_pos : pos < gene.coding_strand.seq.length
-  · -- In-bounds: inspect the original-base guard
+  · -- In-bounds: we inspect the original-base guard
     simp [h_pos] at h_apply
-    -- Name the local current base like the function does
+    -- we name the local current base like the function does
     let cur := gene.coding_strand.seq.getD pos DNABase.N
     by_cases hmatch : cur = original
     · -- Match succeeds: the application must be `some {…}`
       have h_apply' := h_apply
       simp [cur, hmatch] at h_apply'
-      -- Rewrite mutated_gene to the concrete record
       cases h_apply'
       -- Splicing is invariant under safe intronic substitution
       have h_splice :
@@ -3117,8 +2832,9 @@ theorem intronic_substitution_preserves_protein (gene : Gene) (pos : Nat)
           (Bio.Genetics.splice_independent_of_intronic_pos
               gene pos new h_intronic h_safe h_sep)
       -- Proteins equal since splice output is equal
-      simp [synthesizeProtein, h_splice]
-      aesop
+      simp [synthesizeProtein]
+      refine Option.bind_congr' ?_ fun a => congrFun rfl
+      rw [← h_splice]; (expose_names; rw [right])
     · -- Original does not match: impossible to get `some _`
       aesop
   · -- Out of bounds: impossible to get `some _`
@@ -3129,22 +2845,18 @@ lemma shiftRegionsAfter_preserves_nonempty
     (pos shift : Nat) (regions : List GenomicRegion)
     (h_ne : regions ≠ []) :
     shiftRegionsAfter pos (shift : Int) regions ≠ [] := by
-  -- Use the `= map` characterization for nonnegative shifts
   cases regions with
   | nil =>
     exact (h_ne rfl).elim
   | cons r rs =>
-    -- For a cons, the mapped list is a cons as well.
     have hform :=
       shiftRegionsAfter_nonneg_eq_map pos shift (r :: rs)
-    -- Orient to display the list as a cons
     have hcons :
         shiftRegionsAfter pos (shift : Int) (r :: rs)
           = (shiftRegionAfterNat pos shift r) ::
               (rs.map (shiftRegionAfterNat pos shift)) := by
       simpa [List.map] using hform
     intro hnil
-    -- A cons can never be `[]`
     simp [hcons] at hnil
 
 /-- Convenience wrapper that reuses the general boundedness lemma
@@ -3157,7 +2869,6 @@ lemma exons_bounded_after_insertion_lets
     let shifted_exons := shiftRegionsAfter pos (insLen : Int) gene.exons
     ∀ r' ∈ shifted_exons, r'.end_ ≤ mutated_seq.length := by
   intro insLen mutated_seq shifted_exons
-  -- Directly reuse the core lemma and normalize the local lets
   simpa [insLen, mutated_seq, shifted_exons] using
     (shiftRegionsAfter_bounded_after_insertion
       (gene := gene) (pos := pos) (bases := bases) hpos)
@@ -3237,19 +2948,16 @@ def translateFromCodons : List (List RNABase) → List AminoAcid
 /-- Empty codon maps to `.Error`. -/
 private lemma standardGeneticCode_error_len_zero :
     standardGeneticCode [] = TranslationSignal.Error := by
-  -- Just match the specific empty list case without expansion
   exact rfl
 
 /-- Single-base codon maps to `.Error`. -/
 private lemma standardGeneticCode_error_len_one (a : RNABase) :
     standardGeneticCode [a] = TranslationSignal.Error := by
-  -- Case split on the single base to make the match reduce definitionally.
   cases a <;> unfold standardGeneticCode <;> rfl
 
 /-- Two-base codon maps to `.Error`. -/
 private lemma standardGeneticCode_error_len_two_exact (a b : RNABase) :
     standardGeneticCode [a, b] = TranslationSignal.Error := by
-  -- Case split on both bases to make the match reduce definitionally.
   cases a <;> cases b <;> unfold standardGeneticCode <;> rfl
 
 /-- Short codons (length ≤ 2) map to `.Error`. -/
@@ -3258,17 +2966,14 @@ private lemma standardGeneticCode_error_len_le_two
     standardGeneticCode c = TranslationSignal.Error := by
   cases c with
   | nil =>
-      -- length 0: use the dedicated lemma
       exact standardGeneticCode_error_len_zero
   | cons a t =>
     cases t with
     | nil =>
-        -- length 1: use the dedicated lemma
         exact standardGeneticCode_error_len_one a
     | cons b t2 =>
       cases t2 with
       | nil =>
-          -- length 2: use the dedicated lemma
           exact standardGeneticCode_error_len_two_exact a b
       | cons d t3 =>
           have hgt' : 2 < (a :: b :: d :: t3).length := by simp
@@ -3279,8 +2984,6 @@ private lemma standardGeneticCode_error_len_ge_four
     {a b d e : RNABase} {t4 : List RNABase} :
     standardGeneticCode (a :: b :: d :: e :: t4) = TranslationSignal.Error := by
   classical
-  -- Force the reduction past the third base and expose the tail as nonempty,
-  -- so no explicit 3-base pattern can match and the wildcard `.Error` is chosen.
   cases a <;> cases b <;> cases d <;> cases t4 <;>
     unfold standardGeneticCode <;> rfl
 
@@ -3290,13 +2993,11 @@ private lemma standardGeneticCode_eq_error_of_length_ne_three
     standardGeneticCode c = TranslationSignal.Error := by
   classical
   rcases lt_or_gt_of_ne hne with hlt | hgt
-  · -- length ≤ 2
-    have hle2 : c.length ≤ 2 := by
+  · have hle2 : c.length ≤ 2 := by
       -- `c.length < 3` ↔ `c.length ≤ 2`
       simpa [Nat.lt_succ_iff] using hlt
     exact standardGeneticCode_error_len_le_two c hle2
-  · -- length ≥ 4: expose 4-head shape, then use the long-codon lemma
-    cases c with
+  · cases c with
     | nil =>
         simp at hgt
     | cons a t =>
@@ -3310,10 +3011,8 @@ private lemma standardGeneticCode_eq_error_of_length_ne_three
         | cons d t3 =>
           cases t3 with
           | nil =>
-              -- Here `c.length = 3`, contradicting `hgt`.
               simp at hgt
           | cons e t4 =>
-              -- Now length ≥ 4
               simpa using
                 (standardGeneticCode_error_len_ge_four
                   (a := a) (b := b) (d := d) (e := e) (t4 := t4))
@@ -3331,11 +3030,11 @@ lemma translateFromCodons_eq_translateSignals (codons : List (List RNABase)) :
         simp [translateFromCodons, h3]
         cases hc : standardGeneticCode c with
         | Continue aa =>
-            simp [translateFromCodons, h3, hc, translateSignals, ih]
+            simp [translateSignals, ih]
         | Stop =>
-            simp [translateFromCodons, h3, hc, translateSignals]
+            simp [translateSignals]
         | Error =>
-            simp [translateFromCodons, h3, hc, translateSignals]
+            simp [translateSignals]
       · -- length ≠ 3: head maps to `.Error`, both sides become []
         have hc : standardGeneticCode c = TranslationSignal.Error :=
           standardGeneticCode_eq_error_of_length_ne_three c h3
@@ -3354,22 +3053,20 @@ lemma translate_eq_fromCodons (cds : List RNABase) :
     | nil => simp [translate.go, translateFromCodons]
     | cons c cs ih =>
       simp [translate.go, translateFromCodons]
-      -- We need to handle the case where a codon length is not 3.
       by_cases h_len : c.length = 3
       · simp [h_len]
         cases h_code : standardGeneticCode c
-        · simp [translate.go, translateFromCodons, h_code, ih]
-        · simp [translate.go, translateFromCodons, h_code]
-        · simp [translate.go, translateFromCodons, h_code]
+        · simp [ih]
+        · simp
+        · simp
       · have h_err : standardGeneticCode c = .Error :=
           standardGeneticCode_eq_error_of_length_ne_three c h_len
-        simp [translate.go, translateFromCodons, h_err]
+        simp [h_err]
   exact aux codons
 
 /-- Bridge: `translate` equals `translateSignals ∘ signalsOf`. -/
 lemma translate_eq_translateSignals (p : ProcessedMRNA) :
     translate p.coding_region = translateSignals (signalsOf p) := by
-  -- First, move to the codon-level core.
   calc
     translate p.coding_region
         = translateFromCodons (List.chunkList 3 p.coding_region) := by
@@ -3439,10 +3136,9 @@ lemma proteins_differ_of_witness
                           -- If tail returns none, whole returns none under equal heads
                           simp [firstSignalWitness, heq, hrec] at hw'
                       | some w0 =>
-                          exact ⟨w0, by simp [firstSignalWitness, heq, hrec]⟩
+                          exact ⟨w0, by simp⟩
                     rcases this with ⟨w0, hw0⟩
                     intro h
-                    -- Reduce equality to tails and apply IH
                     have htails : translateSignals st = translateSignals tt := by
                       simpa [translateSignals, heq] using h
                     exact (ih tt w0 hw0) htails
@@ -3529,21 +3225,17 @@ private lemma frameshiftWitness_unpack
       Bio.Genetics.processMRNA rawG = some p ∧
       Bio.Genetics.processMRNA rawM = some q ∧
       firstSignalWitness (signalsOf p) (signalsOf q) = some w := by
-  -- Unfold and case split the pipeline to expose the Some-branches required by `hw`.
   unfold frameshiftSemanticWitness at hw
-  -- applyMutation must be some
   cases happ : applyMutation gene m with
   | none =>
       simp [happ] at hw
   | some mutated =>
-    -- both splices must be some
     cases hsG : Bio.Genetics.splice gene with
     | none => simp [happ, hsG] at hw
     | some rawG =>
       cases hsM : Bio.Genetics.splice mutated with
       | none => simp [happ, hsG, hsM] at hw
       | some rawM =>
-        -- both processed transcripts must be some
         cases hp : Bio.Genetics.processMRNA rawG with
         | none => simp [happ, hsG, hsM, hp] at hw
         | some p =>
@@ -3551,7 +3243,7 @@ private lemma frameshiftWitness_unpack
           | none => simp [happ, hsG, hsM, hp, hq] at hw
           | some q =>
             simp [happ, hsG, hsM, hp, hq] at hw
-            aesop-- ⟨mutated, rawG, rawM, p, q, happ, hsG, hsM, hp, hq, hw⟩
+            aesop
 
 private lemma proteins_ne_of_processed_witness
     (gene mutated : Gene) (rawG rawM : RawMRNA) (p q : ProcessedMRNA) (w : SignalWitness)
@@ -3561,31 +3253,26 @@ private lemma proteins_ne_of_processed_witness
     (hq : Bio.Genetics.processMRNA rawM = some q)
     (hw : firstSignalWitness (signalsOf p) (signalsOf q) = some w) :
     Bio.Genetics.synthesizeProtein gene ≠ Bio.Genetics.synthesizeProtein mutated := by
-  -- From witness, translates of coding regions differ
   have hneq_tr : Bio.Genetics.translate p.coding_region ≠ Bio.Genetics.translate q.coding_region :=
     proteins_differ_of_witness p q w hw
   intro hEq
-  -- Normalize both sides of `synthesizeProtein` to `some (translate …)`
+  -- we normalize both sides of `synthesizeProtein` to `some (translate …)`
   have hs :=
     Bio.Genetics.synthesizeProtein_eq_some_of_processed (g := gene)    (raw := rawG) (p := p) hsG hp
   have hm :=
     Bio.Genetics.synthesizeProtein_eq_some_of_processed (g := mutated) (raw := rawM) (p := q) hsM hq
-  -- Turn `hEq` into an equality between the two `some …`
   have hEq_some :
       some (_root_.Bio.Genetics.translate p.coding_region) =
       some (_root_.Bio.Genetics.translate q.coding_region) := by
     simpa [hs, hm] using hEq
-  -- Extract payload equality with fully-qualified head symbol
   have hEq_payload_root :
       _root_.Bio.Genetics.translate p.coding_region =
       _root_.Bio.Genetics.translate q.coding_region :=
     Option.some.inj hEq_some
-  -- Also rewrite the inequality with the fully-qualified head so the types match
   have hneq_tr_root :
       _root_.Bio.Genetics.translate p.coding_region ≠
       _root_.Bio.Genetics.translate q.coding_region := by
     exact hneq_tr
-  -- Contradict the witness-derived inequality
   exact hneq_tr_root hEq_payload_root
 
 /-- Non-axiomatic, end-to-end: if a frameshift mutation (by arithmetic check) has a semantic
@@ -3597,10 +3284,8 @@ theorem frameshift_with_witness_changes_protein
     ∃ mutated_gene,
       applyMutation gene m = some mutated_gene ∧
       synthesizeProtein gene ≠ synthesizeProtein mutated_gene := by
-  -- Unpack the witness to the concrete objects we need.
   rcases frameshiftWitness_unpack gene m w hw with
     ⟨mutated, rawG, rawM, p, q, happ, hsG, hsM, hp, hq, hw'⟩
-  -- Conclude protein inequality.
   exact ⟨mutated, happ, proteins_ne_of_processed_witness gene mutated rawG rawM p q w hsG hsM hp hq hw'⟩
 
 /-!
@@ -3612,28 +3297,22 @@ theorem frameshift_with_witness_changes_protein
     witness exists (produced by `frameshiftSemanticWitness`). -/
 theorem frameshift_changes_protein
   (gene : Gene) (pos : Nat) (bases : List DNABase)
-  (hOffset : (Bio.Mutation.getCodingOffset gene pos).isSome)
-  (hMod : bases.length % 3 ≠ 0)
+  --(hOffset : (Bio.Mutation.getCodingOffset gene pos).isSome)
+  --(hMod : bases.length % 3 ≠ 0)
   (mutated_gene : Gene)
   (hApply : applyInsertion gene pos bases = some mutated_gene)
   (w : SignalWitness)
   (hw : frameshiftSemanticWitness gene (.Insertion pos bases) = some w)
   : synthesizeProtein gene ≠ synthesizeProtein mutated_gene := by
-  -- Use the witness-based non-axiomatic end-to-end theorem
   have hmain :=
     frameshift_with_witness_changes_protein
       (gene := gene) (m := .Insertion pos bases) (w := w) (hw := hw)
-  -- hmain gives an existential mutated', align it with the concrete mutated_gene via hApply
   rcases hmain with ⟨mutated', happ', hneq'⟩
-  -- unify mutated' with mutated_gene by determinism of applyMutation/applyInsertion
   have happApplyMutation : applyMutation gene (.Insertion pos bases) = some mutated_gene := by
-    -- applyMutation on Insertion definitionally calls applyInsertion
     simpa [applyMutation] using hApply
-  -- some mutated' = some mutated_gene ⇒ mutated' = mutated_gene
   have h_eq_opt : some mutated' = some mutated_gene := by
     simpa [happ'] using happApplyMutation
   have h_eq_mut : mutated' = mutated_gene := Option.some.inj h_eq_opt
-  -- rewrite and conclude
   subst h_eq_mut
   exact hneq'
 
@@ -3646,17 +3325,14 @@ lemma frameshift_single_base_changes_protein
     (gene : Gene) (pos : Nat) (base : DNABase)
     --(h_exonic : IsExonic gene pos)
     --(h_not_codon_boundary : (pos % 3) ≠ 0)
-    (h_in_cds : (Bio.Mutation.getCodingOffset gene pos).isSome)
+    --(h_in_cds : (Bio.Mutation.getCodingOffset gene pos).isSome)
     (w : SignalWitness)
     (hw : frameshiftSemanticWitness gene (.Insertion pos [base]) = some w) :
     ∀ mutated_gene, applyInsertion gene pos [base] = some mutated_gene →
       synthesizeProtein gene ≠ synthesizeProtein mutated_gene := by
   intro mutated_gene hApply
-  -- 1 % 3 ≠ 0
   have h_len : ([base].length % 3) ≠ 0 := by simp
-  -- Use the constructive frameshift theorem
-  exact frameshift_changes_protein
-    gene pos [base] h_in_cds h_len mutated_gene hApply w hw
+  exact frameshift_changes_protein gene pos [base] mutated_gene hApply w hw
 
 /--
 A single-base insertion in the CDS at an offset not divisible by 3
@@ -3668,18 +3344,13 @@ theorem single_base_insertion_in_cds_changes_protein_semantic
     (h_apply : applyInsertion gene pos [base] = some mutated_gene)
     (cds_offset : Nat)
     (h_offset : getCodingOffset gene pos = some cds_offset)
-    --(h_frameshift : cds_offset % 3 ≠ 0)
     (w : SignalWitness)
     (hw : frameshiftSemanticWitness gene (.Insertion pos [base]) = some w) :
     synthesizeProtein gene ≠ synthesizeProtein mutated_gene := by
-  -- CDS membership as Option.isSome
   have h_in_cds : (getCodingOffset gene pos).isSome := by
-    -- from equality to isSome
     simp [h_offset]
-  -- 1 % 3 ≠ 0
   have h_len : ([base].length % 3) ≠ 0 := by simp
-  -- Conclude via constructive frameshift theorem
-  exact frameshift_changes_protein gene pos [base] h_in_cds h_len mutated_gene h_apply w hw
+  exact frameshift_changes_protein gene pos [base] mutated_gene h_apply w hw
 
 /-! ### Theorem 3: Frameshift from Single-Base Insertion -/
 
@@ -3692,7 +3363,6 @@ lemma frameshift_single_base_is_classified_frameshift
     (h_in_cds : (Bio.Mutation.getCodingOffset gene pos).isSome) :
     analyzeMutationEffect gene (Mutation.Insertion pos [base]) = MutationEffect.Frameshift := by
   have h_frameshift : Bio.Mutation.mutationIsFrameshift gene (Mutation.Insertion pos [base]) := by
-    -- [base].length = 1, and 1 % 3 ≠ 0
     simp [Bio.Mutation.mutationIsFrameshift, h_in_cds]
   simp [analyzeMutationEffect, h_frameshift]
 
@@ -3713,13 +3383,10 @@ theorem single_base_insertion_causes_frameshift
   -- The insertion of a single base at an exonic position yields a valid mutated gene.
   -- We then conclude protein change by the domain postulate.
   intro ins_mutation
-  -- exonic ⇒ pos < length ⇒ pos ≤ length (needed by applyInsertion)
   have hlt : pos < gene.coding_strand.seq.length := by
     rcases h_exonic with ⟨r, hr, _, h_in_end⟩
     exact lt_of_lt_of_le h_in_end (gene.h_exons_bounded r hr)
   have h_pos : pos ≤ gene.coding_strand.seq.length := Nat.le_of_lt hlt
-
-  -- Let-bind as in applyInsertion to align exactly with its return shape.
   set insLen := [base].length with hins
   set mutated_seq :=
     gene.coding_strand.seq.take pos ++ [base] ++ gene.coding_strand.seq.drop pos with hmut
@@ -3730,7 +3397,7 @@ theorem single_base_insertion_causes_frameshift
     simpa [shifted_exons, hshift, insLen, hins] using
       shiftRegionsAfter_preserves_nonempty
         pos insLen gene.exons gene.h_exons_nonempty
-  -- Build the witness mutated gene matching applyInsertion’s record exactly.
+  -- we build the witness mutated gene matching applyInsertion’s record exactly.
   refine ⟨
     {
       id := gene.id
@@ -3745,39 +3412,29 @@ theorem single_base_insertion_causes_frameshift
           (shiftRegionsAfter_preserves_sorted
             (pos := pos) (shift := insLen) (regions := gene.exons) gene.h_exons_sorted)
       h_exons_bounded := by
-        -- Reuse the lets-specialized boundedness lemma.
         intro r' hr'
         have core :=
           exons_bounded_after_insertion_lets
             (gene := gene) (pos := pos) (bases := [base]) h_pos
-        -- First align the membership to the core lemma’s shifted_exons
         have hb' :
             r'.end_ ≤ (gene.coding_strand.seq.take pos ++ [base] ++ gene.coding_strand.seq.drop pos).length :=
           core r' (by simpa [shifted_exons, hshift, insLen, hins])
-        -- Now normalize to our local lets
         have hb : r'.end_ ≤ mutated_seq.length := by
           simpa [mutated_seq, hmut] using hb'
-        -- Goal uses the record’s coding_strand field; unfold it
         simpa
       h_exons_nonempty := h_nonempty_after
     },
     ?heq,
     ?hneq
   ⟩
-  -- Equality: unfold applyInsertion and discharge the if-branches by simp.
-  ·
-    -- Derive the guard used inside applyInsertion from h_nonempty_after
-    have h_guard :
+  · have h_guard :
         Bio.Mutation.shiftRegionsAfter pos (insLen : Int) gene.exons ≠ [] := by
       simpa [shifted_exons, hshift, insLen, hins] using h_nonempty_after
-    -- applyInsertion returns exactly the above record under h_pos and h_guard
-    simp [applyInsertion, h_pos, insLen, hins, mutated_seq, hmut,
-          shifted_exons, hshift, h_guard]
+    simp [applyInsertion, h_pos, insLen, hins, mutated_seq,
+          shifted_exons]
     aesop
-  -- Protein change: invoke the frameshift lemma (which uses the domain postulate).
-  ·
-    -- Re-derive the same equality to feed the domain-axiom wrapper.
-    have h_guard :
+  -- Protein change: we invoke the frameshift lemma (which uses the domain postulate).
+  · have h_guard :
         Bio.Mutation.shiftRegionsAfter pos (insLen : Int) gene.exons ≠ [] := by
       simpa [shifted_exons, hshift, insLen, hins] using h_nonempty_after
     have happly :
@@ -3799,7 +3456,6 @@ theorem single_base_insertion_causes_frameshift
                 have core :=
                   exons_bounded_after_insertion_lets
                     (gene := gene) (pos := pos) (bases := [base]) h_pos
-                -- Align membership then normalize lengths
                 have hb' :
                     r'.end_ ≤ (gene.coding_strand.seq.take pos ++ [base] ++ gene.coding_strand.seq.drop pos).length :=
                   core r' (by simpa [shifted_exons, hshift, insLen, hins])
@@ -3809,10 +3465,60 @@ theorem single_base_insertion_causes_frameshift
               h_exons_nonempty := h_nonempty_after } := by
       simpa [applyInsertion, h_pos, insLen, hins, mutated_seq, hmut,
              shifted_exons, hshift, h_guard]
-    -- From above, use the constructive single-base frameshift lemma with a semantic witness.
-    apply frameshift_single_base_changes_protein
-            gene pos base h_in_cds w hw
-    exact happly
+    exact
+      frameshift_changes_protein gene pos [base]
+        { id := gene.id, coding_strand := { seq := mutated_seq }, exons := shifted_exons,
+          splice_sites := gene.splice_sites, promoter_region := gene.promoter_region,
+          poly_a_site := Option.map (fun p => if p ≥ pos then p + insLen else p) gene.poly_a_site,
+          strand := gene.strand,
+          h_exons_sorted :=
+            Eq.mpr
+              (id
+                (congrArg
+                  (fun x =>
+                    Chain' (fun r1 r2 => r1.end_ ≤ r2.start) (shiftRegionsAfter pos x gene.exons))
+                  (Eq.trans (congrArg Nat.cast (zero_add 1)) Nat.cast_one)))
+              (Eq.mp
+                (congrArg
+                  (fun x =>
+                    Chain' (fun r1 r2 => r1.end_ ≤ r2.start) (shiftRegionsAfter pos x gene.exons))
+                  (Eq.trans (congrArg Nat.cast (zero_add 1)) Nat.cast_one))
+                (shiftRegionsAfter_preserves_sorted pos insLen gene.exons gene.h_exons_sorted)),
+          h_exons_bounded := fun r' hr' =>
+            have core := exons_bounded_after_insertion_lets gene pos [base] h_pos;
+            have hb' :=
+              core r'
+                (Eq.mpr
+                  (id
+                    (congrArg (fun x => r' ∈ shiftRegionsAfter pos x gene.exons)
+                      (Eq.trans (congrArg Nat.cast (zero_add 1)) Nat.cast_one)))
+                  hr');
+            have hb :=
+              Eq.mpr
+                (id
+                  (congrArg (LE.le r'.end_)
+                    (Eq.trans
+                      (Eq.trans
+                        (congrArg length
+                          (append_assoc (take pos gene.coding_strand.seq) [base]
+                            (drop pos gene.coding_strand.seq)))
+                        length_append)
+                      (congr (congrArg HAdd.hAdd length_take)
+                        (congrArg (fun x => x + 1) length_drop)))))
+                (Eq.mp
+                  (congrArg (LE.le r'.end_)
+                    (Eq.trans
+                      (Eq.trans
+                        (congrArg length
+                          (append_assoc (take pos gene.coding_strand.seq) [base]
+                            (drop pos gene.coding_strand.seq)))
+                        length_append)
+                      (congr (congrArg HAdd.hAdd length_take)
+                        (congrArg (fun x => x + 1) length_drop))))
+                  hb');
+            Eq.mpr (id ge_iff_le._simp_1) hb,
+          h_exons_nonempty := h_nonempty_after }
+        happly w hw
 
 /-! ### Semantic Proof of Frameshift Protein Change -/
 
@@ -3826,7 +3532,6 @@ lemma chunkList_cons_after_insertion {α : Type u} (l : List α) (x : α) (k : N
     List.chunkList 3 l' =
       List.chunkList 3 (l'.take (k - k % 3) ++ l'.drop (k - k % 3)) := by
   intro l'
-  -- Directly rewrite with take_append_drop and congrArg
   simp
 
 
@@ -3838,9 +3543,7 @@ lemma findStartCodon_none_if_no_aug (mrna : Bio.Sequence.MRNA)
        (mrna.seq.drop mrna.five_utr_length)[i+1]! = Bio.RNABase.U ∧
        (mrna.seq.drop mrna.five_utr_length)[i+2]! = Bio.RNABase.G)) :
     findStartCodon mrna = none := by
-  -- Work on the coding sequence
   set seq := mrna.seq.drop mrna.five_utr_length with hseq
-  -- Aux lemma: if a list has no AUG at any position, aux never pushes, so it returns acc.reverse
   have aux_nil :
       ∀ (rem : List Bio.RNABase) (idx : Nat) (acc : List (Nat × Nat)),
         (∀ i, i + 2 < rem.length →
@@ -3854,40 +3557,28 @@ lemma findStartCodon_none_if_no_aug (mrna : Bio.Sequence.MRNA)
       intro idx acc hno
       cases rem with
       | nil =>
-        -- only one element, cannot contain AUG
         simp [Bio.Genetics.findAndScoreStartCodons.aux]
       | cons b rem' =>
         cases rem' with
         | nil =>
-          -- only two elements, cannot contain AUG
           simp [Bio.Genetics.findAndScoreStartCodons.aux]
         | cons c rem'' =>
-          -- Show the head is not AUG using hno at index 0
           have hhead : ¬(a = Bio.RNABase.A ∧ b = Bio.RNABase.U ∧ c = Bio.RNABase.G) := by
             intro habc; rcases habc with ⟨ha, hb, hc⟩; subst ha hb hc
             have hlen : 0 + 2 < (Bio.RNABase.A :: Bio.RNABase.U :: Bio.RNABase.G :: rem'').length := by simp
             have := hno 0 hlen
-            -- At index 0 we do have AUG, contradiction
             simp at this
-          -- No AUG at head ⇒ aux takes the “_ :: rest” branch
-          -- Build the shifted “no AUG” hypothesis for the tail (starting at index 0 of b::c::rem'')
           have h_tail :
               ∀ i, i + 2 < (b :: c :: rem'').length →
                 ¬(((b :: c :: rem'')[i]! = Bio.RNABase.A) ∧
                   ((b :: c :: rem'')[i+1]! = Bio.RNABase.U) ∧
                   ((b :: c :: rem'')[i+2]! = Bio.RNABase.G)) := by
             intro i hi
-            -- Map to original indices: (i+1) in a::b::c::rem''
             have hi' : (i + 1) + 2 < (a :: b :: c :: rem'').length := by
               simpa using Nat.succ_lt_succ hi
             have := hno (i + 1) hi'
-            -- Rewrite getElem! through cons to align indices
             simpa using this
-          -- Reduce one step, then apply IH on tail with idx+1 and same acc
           have := ih (idx + 1) acc h_tail
-          -- Use the fact head is not AUG to select the second branch
-          -- This is achieved by case analysis on a,b,c matching against A,U,G
-          -- so that simp goes to the “_ :: rest” branch.
           by_cases hA : a = Bio.RNABase.A
           · by_cases hU : b = Bio.RNABase.U
             · by_cases hG : c = Bio.RNABase.G
@@ -3895,15 +3586,11 @@ lemma findStartCodon_none_if_no_aug (mrna : Bio.Sequence.MRNA)
               · subst hA; subst hU; simp [Bio.Genetics.findAndScoreStartCodons.aux, hG, this]
             · subst hA; simp [Bio.Genetics.findAndScoreStartCodons.aux, hU, this]
           · simp [Bio.Genetics.findAndScoreStartCodons.aux, hA, this]
-  -- Candidates are empty by applying aux_nil at idx=0, acc=[]
   have h_empty : findAndScoreStartCodons seq = [] := by
-    -- Unfold the outer definition just to expose the call to aux; then reuse aux_nil
     unfold findAndScoreStartCodons
     simpa using aux_nil seq 0 [] (by
-      -- h_no_aug is exactly the required hypothesis on seq
       intro i hi; exact h_no_aug i (by simpa [hseq] using hi))
-  -- Now rewrite findStartCodon with empty candidates; foldl on [] gives none
-  simp [findStartCodon, hseq, h_empty]
+  simp [findStartCodon]
   aesop
 
 theorem no_start_no_protein (mrna : Bio.Sequence.MRNA) :
@@ -3911,7 +3598,6 @@ theorem no_start_no_protein (mrna : Bio.Sequence.MRNA) :
      ¬(mrna.seq[i]! = Bio.RNABase.A ∧ mrna.seq[i+1]! = Bio.RNABase.U ∧ mrna.seq[i+2]! = Bio.RNABase.G)) →
     findStartCodon mrna = none := by
   intro h_no_aug
-  -- Convert the hypothesis to work on the dropped sequence
   have h_no_aug_dropped : ∀ i, i + 2 < (mrna.seq.drop mrna.five_utr_length).length →
      ¬((mrna.seq.drop mrna.five_utr_length)[i]! = Bio.RNABase.A ∧
        (mrna.seq.drop mrna.five_utr_length)[i+1]! = Bio.RNABase.U ∧
@@ -3921,7 +3607,6 @@ theorem no_start_no_protein (mrna : Bio.Sequence.MRNA) :
       simp [List.length_drop] at hi
       omega
     specialize h_no_aug (mrna.five_utr_length + i) h_bound
-    -- avoid List.getElem! in simp set; use get?_drop and bridge lemma
     simp [getElem!_eq_getElem?_getD, List.getElem?_drop] at *
     convert h_no_aug using 2
   exact findStartCodon_none_if_no_aug mrna h_no_aug_dropped
@@ -3946,7 +3631,7 @@ theorem strong_kozak_preferred :
 end Genetics
 end Bio
 
--- Section 7: Comprehensive Examples
+/- ### Section 7: Examples -/
 namespace Bio.Examples
 
 open Bio Bio.Sequence Bio.Genetics Bio.Mutation
@@ -4066,20 +3751,16 @@ end Bio.Examples
 /-!
 # Extensions to the Formal Model of Eukaryotic Gene Expression
 
-This file implements the concrete next steps outlined in the paper's "Path Forward"
-section. It addresses two primary limitations of the foundational kernel:
+This section addresses two primary limitations of the foundational kernel:
 1.  **Biological Fidelity (Double-Stranded Genes):** It introduces a `strand`
     field to the `Gene` structure and defines a verified `reverseComplement`
-    function. This demonstrates the path to handling genes on both the plus and
+    function. This shows the path to handling genes on both the plus and
     minus strands of a chromosome through normalization.
 2.  **Stochasticity (Probabilistic Splicing):** It introduces a placeholder
     `Distribution` monad to model probabilistic outcomes. It reframes splicing
     as a stochastic process, separating the mechanics of isoform assembly from
     the probabilistic, regulatory logic that determines which isoforms are produced.
 
-This code is intended to demonstrate the extensibility and defensibility of the
-modeling approach, showing how the verified kernel can serve as a foundation
-for more complex, realistic models.
 -/
 namespace Bio.Extensions
 
@@ -4147,7 +3828,6 @@ lemma complement_involutive (b : DNABase) : complementBase (complementBase b) = 
 
 theorem reverseComplement_involutive (dna : DNAStrand) :
     reverseComplement (reverseComplement dna) = dna := by
-  -- Reduce record equality to the `seq` field and simplify maps/reverses.
   ext
   simp [reverseComplement, List.map_reverse, List.reverse_reverse, List.map_map, Function.comp, complement_involutive]
 
@@ -4184,7 +3864,6 @@ def Distribution.bind {α β : Type} (d : Distribution α) (f : α → Distribut
   match d with
   | [] => []
   | (p, a) :: ds =>
-      -- Use List.append to avoid HAppend typeclass issues with ++
       List.append
         ((f a).map (fun (q, b) => (p * q, b)))
         (Distribution.bind ds f)
@@ -4198,7 +3877,7 @@ structure RegulatoryContext where
 A conceptual function representing the complex logic that determines which
 splicing patterns occur and with what frequency, based on regulatory context.
 
-In a real model, this would be a sophisticated function. Here, we hard-code
+In a better model, this would be a sophisticated function. Here, we hard-code
 a response for a specific gene to demonstrate the principle.
 -/
 def determineSplicingPattern (gene : Gene) (ctx : RegulatoryContext) : Distribution (List Nat) :=
@@ -4285,7 +3964,7 @@ open Bio Bio.Sequence Bio.Genetics Bio.Extensions
 # A Verifiable Model of Stochastic Gene Expression
 
 This file implements the non-placeholder stochastic layer for the gene expression
-model, directly following the three-layer architecture recommended by expert review.
+model.
 It provides a robust framework for reasoning about probabilistic biological outcomes,
 such as alternative splicing.
 
@@ -4308,7 +3987,7 @@ such as alternative splicing.
     *   States the main theorem of correctness: that the denotation of the
       splicing program is equal to the mathematical specification.
 
-This approach provides the "best of both worlds": a high-level, abstract model for
+This approach aims at providing the "best of both worlds": a high-level, abstract model for
 mathematical proofs (e.g., of convergence) and a low-level, executable model for
 verification of specific algorithms.
 -/
@@ -4320,9 +3999,8 @@ namespace Bio.Verified.Stochastic
 --open Bio.Verified.Genetics
 open PMF ENNReal Real
 
--- ==================================================================
--- Layer 1: The Mathematical Specification (Using Mathlib)
--- ==================================================================
+-- Layer 1
+
 namespace Spec
 
 /--
@@ -4342,8 +4020,7 @@ noncomputable def determineSplicingPatternSpec (input : Gene × RegulatoryContex
   classical
   let (gene, ctx) := input
   by_cases h : gene.id = "MY_GENE_1" ∧ ctx.cell_type = "liver"
-  ·
-    -- Finite support over the three explicit patterns.
+  ·  -- Finite support over the three explicit patterns.
     let support : Finset (List Nat) := { [0, 1, 2], [0, 2], [] }
     -- Integer base weights 7/10, 2/10, 1/10 expressed as (·) * (10)⁻¹ in ℝ≥0∞.
     let baseW : List Nat → ℝ≥0∞ :=
@@ -4363,7 +4040,6 @@ noncomputable def determineSplicingPatternSpec (input : Gene × RegulatoryContex
           norm_num
         -- simp gives 7 + (2 + 1); align with (7 + 2) + 1 and apply the equality above.
         simpa [support, baseW, add_assoc] using this
-
       -- Pull out the common normalization factor (10)⁻¹ from the sum.
       have hfac :
           ∑ a ∈ support, mass a
@@ -4397,12 +4073,11 @@ noncomputable def determineSplicingPatternSpec (input : Gene × RegulatoryContex
       have h2 := hne.2.1
       have h3 := hne.2.2
       simp [mass, baseW, h1, h2, h3]
-  ·
-    -- Default behavior: always produce the full transcript (deterministically).
+  · -- Default behavior: always produce the full transcript (deterministically).
     exact PMF.pure (List.range gene.exons.length)
 
 /--
-**The full MATHEMATICAL SPECIFICATION for stochastic splicing.**
+**Stochastic splicing.**
 This kernel chains the regulatory choice with the deterministic splicing mechanic.
 It is the "ground truth" definition of a correct stochastic splice.
 -/
@@ -4411,7 +4086,6 @@ noncomputable def stochasticSplicingSpec [Fintype (List ℕ)] : PMFKernel (Gene 
     let (gene, _) := input
     -- 1. Get the distribution of possible exon patterns.
     let pattern_pmf := determineSplicingPatternSpec input
-
     -- 2. Monadically bind this choice to the deterministic splicing outcome.
     pattern_pmf.bind (fun exon_indices =>
       -- For a given pattern, the outcome is deterministic.
@@ -4436,9 +4110,8 @@ noncomputable def stochasticSplicingSpec [Fintype (List ℕ)] : PMFKernel (Gene 
 
 end Spec
 
--- ==================================================================
--- Layer 2: The Probabilistic Programming Language (`SLang`)
--- ==================================================================
+-- Layer 2:`SLang`
+
 namespace Prog
 
 /--
@@ -4462,7 +4135,7 @@ noncomputable instance : Monad SLang where
 A sampler for a categorical distribution. Given a list of outcomes and their
 associated weights (as non-negative reals), it returns a `SLang` program
 that samples from that distribution.
-This is a crucial, non-placeholder sampler.
+This is a non-placeholder sampler.
 -/
 noncomputable def probCategorical (choices : List (α × NNReal)) : SLang α := by
   classical
@@ -4470,17 +4143,14 @@ noncomputable def probCategorical (choices : List (α × NNReal)) : SLang α := 
   let totalWeight := (choices.map (fun c => c.2)).sum
   refine if h_total : totalWeight = 0 then ?empty else ?nonempty
   · exact fun _ => 0 -- If all weights are zero, this is an empty distribution.
-  ·
-    intro outcome
+  · intro outcome
     -- Find the weight of the specified outcome in the list.
-    -- List.find? expects a Bool predicate; use `decide` on propositional equality.
     let weight := (choices.find? (fun c => decide (c.1 = outcome))).map (·.2) |>.getD 0
     -- The probability is the outcome's weight divided by the total.
     exact (weight : ℝ≥0∞) / (totalWeight : ℝ≥0∞)
 
 /--
-**THE PROGRAM** for stochastic splicing, written in `SLang`.
-This is a concrete, executable algorithm.
+The program for stochastic splicing, written in `SLang` aimed at providing an executable algorithm.
 -/
 noncomputable def stochasticSplicingProg (input : Gene × Spec.RegulatoryContext) : SLang (Option RawMRNA) :=
   let (gene, ctx) := input
@@ -4492,7 +4162,6 @@ noncomputable def stochasticSplicingProg (input : Gene × Spec.RegulatoryContext
         ([], 0.1) ]
     else
       [ (List.range gene.exons.length, 1.0) ]
-
   -- 2. Use the categorical sampler to choose a splicing pattern.
   do
     let exon_indices ← probCategorical patterns_with_weights
@@ -4510,9 +4179,8 @@ noncomputable def stochasticSplicingProg (input : Gene × Spec.RegulatoryContext
     else
       return none
 
--- ==================================================================
 -- Layer 3: The Denotational Semantics Bridge
--- ==================================================================
+
 namespace Bridge
 
 open Prog
@@ -4528,10 +4196,10 @@ noncomputable def denote (prog : SLang α) (h_norm : HasSum prog 1) : PMF α :=
   PMF.normalize prog
     (by
       -- tsum prog = 1 ⇒ ≠ 0
-      simpa [h_norm.tsum_eq] )
+      simp [h_norm.tsum_eq] )
     (by
       -- tsum prog = 1 ⇒ ≠ ∞
-      simpa [h_norm.tsum_eq] )
+      simp [h_norm.tsum_eq] )
 
 -- We can now prove that the `SLang` primitives correspond to the `PMF` primitives.
 
@@ -4542,10 +4210,8 @@ theorem denote_pure (a : α) :
       simpa [probPure] using (hasSum_ite_eq a (1 : ℝ≥0∞))
     ) = PMF.pure a := by
   classical
-  -- Compute tsum of `probPure a`
   have htsum : ∑' x, probPure a x = (1 : ℝ≥0∞) := by
     simp [probPure]
-  -- Normalize by 1 leaves the mass unchanged.
   ext x
   simp [denote, PMF.normalize_apply, probPure, PMF.pure, htsum]
   aesop
@@ -4555,8 +4221,6 @@ theorem denote_bind {p : SLang α} {f : α → SLang β}
     denote (probBind p f)
       (by
         classical
-        -- Show that the total mass of `probBind p f` is 1.
-        -- ∑_b (∑_a p a * f a b) = ∑_a p a * (∑_b f a b) = ∑_a p a * 1 = (∑_a p a) * 1 = 1
         have : ∑' (b : β), (∑' a, p a * f a b) = (1 : ℝ≥0∞) := by
           calc
             (∑' b, (∑' a, p a * f a b))
@@ -4572,10 +4236,8 @@ theorem denote_bind {p : SLang α} {f : α → SLang β}
       )
     = (denote p hp).bind (fun a => denote (f a) (hf a)) := by
   classical
-  -- Since tsum p = 1 and tsum (f a) = 1, normalization is identity.
   have hp_sum : ∑' a, p a = (1 : ℝ≥0∞) := hp.tsum_eq
   have hf_sum : ∀ a, ∑' b, f a b = (1 : ℝ≥0∞) := fun a => (hf a).tsum_eq
-  -- Total mass of probBind p f is 1.
   have h_bind_sum : ∑' (x : β), Prog.probBind p f x = (1 : ℝ≥0∞) := by
     calc
       (∑' x, Prog.probBind p f x)
@@ -4588,11 +4250,9 @@ theorem denote_bind {p : SLang α} {f : α → SLang β}
               simp [hfa]
       _   = ((∑' a, p a) * 1) := ENNReal.tsum_mul_right
       _   = (1 : ℝ≥0∞) := by simp [hp_sum]
-  -- Prepare inverse equalities for normalization factors.
   have inv_bind_sum : (∑' (x : β), Prog.probBind p f x)⁻¹ = 1 := by
     simp [h_bind_sum]
   have inv_bind_nested : (∑' (x : β) (a : α), p a * f a x)⁻¹ = 1 := by
-    -- Expand probBind inside the outer tsum to match the goal's shape.
     have h := inv_bind_sum
     simp [Prog.probBind] at h
     exact inv_bind_sum-- h
@@ -4601,20 +4261,16 @@ theorem denote_bind {p : SLang α} {f : α → SLang β}
   have inv_f : ∀ a, (∑' (x : β), f a x)⁻¹ = 1 := by
     intro a; simp [hf_sum a]
   ext b
-  -- Expand normalization and rewrite all inverses to `1`.
   simp [denote, PMF.normalize_apply, Prog.probBind, PMF.bind_apply, inv_bind_nested, inv_p, inv_f,
         mul_comm, mul_left_comm, mul_assoc]
 -- Note:
--- The full end-to-end correctness theorem depends on a finished, executable Spec.
--- We drop it here to avoid placeholders and ensure the file is sorry-free.
+-- TODO: a full end-to-end correctness theorem depends on a finished, executable Spec.
 
 end Bridge
 
--- ==================================================================
 -- Example Usage
--- ==================================================================
 
--- A sample 3-exon gene for demonstrating stochastic splicing.
+-- A sample 3-exon gene for showing stochastic splicing.
 def sampleGene : Gene := {
   id := "MY_GENE_1"
   coding_strand := { seq := List.replicate 100 .N }
@@ -4639,15 +4295,16 @@ def sampleGene : Gene := {
 -- Define a specific regulatory context.
 def liver_context : Spec.RegulatoryContext := { cell_type := "liver" }
 
--- Use #check instead of #eval: evaluating a function value requires a printable instance.
 #check Prog.stochasticSplicingProg (sampleGene, liver_context)
 
 /-
-To actually see probabilities, apply the function to a concrete outcome (e.g., `none`)
-or a constructed `Option RawMRNA`; avoid evaluating the bare function value.
+To actually see probabilities, we apply the function to a concrete outcome (e.g., `none`)
+or a constructed `Option RawMRNA`; we avoid evaluating the bare function value.
 -- Examples (uncomment if desired and if printing ℝ≥0∞ is supported):
 -- #eval (Prog.stochasticSplicingProg (sampleGene, liver_context)) none
 -/
 
 end Prog
 end Bio.Verified.Stochastic
+
+#min_imports
